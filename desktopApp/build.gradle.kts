@@ -58,7 +58,7 @@ compose.desktop {
                 debMaintainer  = "nyora-dev@nyora.app"
                 menuGroup      = "Graphics"
                 appCategory    = "Utility"
-                // iconFile.set(project.file("src/main/resources/nyora.png"))
+                iconFile.set(project.file("src/main/resources/nyora.png"))
             }
 
             // Bundle a JRE so users don't need one pre-installed.
