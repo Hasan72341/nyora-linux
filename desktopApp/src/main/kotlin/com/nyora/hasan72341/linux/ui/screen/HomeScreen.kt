@@ -7,7 +7,6 @@ import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -72,7 +71,7 @@ fun HomeScreen(state: AppState) {
         item(span = { GridItemSpan(maxLineSpan) }) {
             Spacer(Modifier.height(16.dp))
             SectionHeader(
-                title = "For You",
+                title = "Discover",
                 subtitle = "Trending on AniList",
                 modifier = Modifier.padding(bottom = 8.dp)
             )
