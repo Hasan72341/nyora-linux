@@ -71,7 +71,7 @@ fun WelcomeScreen(state: AppState) {
             )
             Spacer(Modifier.height(28.dp))
             Text(
-                "破壊 · MANGA, UNINTERRUPTED",
+                "破壊 · Manga, anywhere the night takes you",
                 color = accent,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
@@ -97,7 +97,7 @@ fun WelcomeScreen(state: AppState) {
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                "Your whole library — synced, private, and yours. Sign in to carry your shelf across every device, or dive straight in.",
+                "Nyora pulls hundreds of sources into one quiet shelf and remembers exactly where you stopped — on your phone, your tablet, your desk. Sign in to sync and back it up, or just start reading.",
                 color = NyoraTokens.onSurfaceMuted,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center,

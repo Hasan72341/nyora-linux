@@ -570,7 +570,7 @@ private fun SettingsDetail(state: AppState, key: String, onBack: () -> Unit) {
             }
             HairlineDivider()
             // Debug HUD
-            SettingsToggle("Translation Pipeline HUD", state.debugHud) {
+            SettingsToggle("Translation debug overlay", state.debugHud) {
                 state.debugHud = it; state.persistSettings()
             }
             HairlineDivider()
