@@ -1,57 +1,80 @@
-# Nyora for Linux
+<div align="center">
 
-An AI-powered manga reader — the Linux desktop build of [Nyora](https://nyora.app), built with Compose Desktop over the shared Kotatsu engine. Ships with a bundled Java runtime, so there's nothing else to install.
+<img src="https://nyora.pages.dev/icon.png" width="112" alt="Nyora"/>
 
-## Features
+# Nyora — Linux
 
-- **Huge source catalogue** — browse, search and filter hundreds of online manga/manhwa/manhua sources via the shared Kotatsu parser engine.
-- **Standard & Webtoon reader** — paged (LTR/RTL) and vertical webtoon modes, zoom, double-page spreads and per-title settings.
-- **AI page translation** — translate a whole page at once: **Tesseract** OCR detects the text, which is then translated and typeset back over the art.
-- **Dynamic colour correction** — adjust brightness, contrast and colour filters live while reading.
-- **Library that stays organized** — favourites in custom categories, reading history, resume-where-you-left-off, and incognito mode.
-- **Offline downloads** — download chapters for offline reading.
-- **Tracker integration** — sync reading progress with online trackers.
-- **Backup & restore** — export/import your library.
-- **Cloud sync** — sign in with Google (loopback OAuth) and your library, favourites, categories, history and progress sync across all your Nyora devices (Supabase backend).
-- **Themes** — light / dark / system.
+### Read like the world can wait.
 
-## Install
+A native **Linux** manga reader built from scratch with **Compose Multiplatform** — hundreds of online sources, AI page translation, and a one-line installer that works on every major distro. Bundled Java runtime, nothing else to install.
 
-**Quick install** (auto-detects your distro and CPU architecture):
+[![License: Apache 2.0](https://img.shields.io/github/license/Hasan72341/nyora-linux?color=blue)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/Hasan72341/nyora-linux?label=download&color=0ae448)](https://github.com/Hasan72341/nyora-linux/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Hasan72341/nyora-linux/total?color=9d95ff)](https://github.com/Hasan72341/nyora-linux/releases)
+[![Stars](https://img.shields.io/github/stars/Hasan72341/nyora-linux?style=social)](https://github.com/Hasan72341/nyora-linux/stargazers)
+
+**[⬇️ Releases](https://github.com/Hasan72341/nyora-linux/releases/latest)** · **[🌐 nyora.pages.dev](https://nyora.pages.dev)**
+
+</div>
+
+---
+
+## ⬇️ Install
+
+**One line — auto-detects your distro & CPU:**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Hasan72341/nyora-linux/main/install.sh | bash
 ```
 
-**Or grab a package from the [latest release](https://github.com/Hasan72341/nyora-linux/releases/latest):**
+Covers **Debian/Ubuntu/Kali/Parrot** (`.deb`), **Fedora/RHEL/Rocky/openSUSE** (`.rpm`), and **Arch/Manjaro + anything else** (portable, glibc) — for **x86_64 and ARM64**. Nyora adds itself to your application menu automatically. Or grab a package from the **[Releases page](https://github.com/Hasan72341/nyora-linux/releases/latest)**.
 
-| Distro family | Package | Architectures |
-|---|---|---|
-| Debian · Ubuntu · Mint · Pop!_OS | `Nyora-linux-<arch>.deb` | x86_64, arm64 |
-| Fedora · RHEL · openSUSE | `Nyora-linux-<arch>.rpm` | x86_64, arm64 |
-| Any other distro (portable) | `Nyora-linux-<arch>-portable.tar.gz` | x86_64, arm64 |
+## ✨ Features
 
-For the portable build, extract it and run `bin/Nyora`:
+- 📚 **Hundreds of online sources** — manga, manhwa & manhua.
+- 🌐 **AI page translation** — **Tesseract** OCR detects the text, then it's translated and typeset back over the page.
+- 📖 **Standard & Webtoon reader** — LTR / RTL / vertical, zoom, double-page, per-title settings.
+- 🎨 **Dynamic colour correction** while reading.
+- 🗂️ Favourites in custom categories, history, resume, **incognito**, offline downloads, backup/restore.
+- 🔄 **Tracker integration** + ☁️ **cloud sync** (sign in with Google; library & progress sync across devices).
+- 🖥️ Auto app-menu entry · responsive window (fits any resolution) · light / dark / system themes.
 
-```bash
-tar -xzf Nyora-linux-x86_64-portable.tar.gz
-./nyora/bin/Nyora
-```
+## 🛠️ Build from source
 
-> 32-bit x86 isn't supported — Compose Desktop and JDK 17 are 64-bit only.
-
-## Build from source
-
-Requires JDK 17+ (with `jpackage`) and the `nyora-shared` submodule.
+Requires **JDK 17+** (with `jpackage`) and the `nyora-shared` submodule.
 
 ```bash
 git clone --recurse-submodules https://github.com/Hasan72341/nyora-linux.git
 cd nyora-linux
-./gradlew :desktopApp:packageReleaseDeb   # or packageReleaseRpm / createReleaseDistributable
+./gradlew :desktopApp:run                       # run
+./gradlew :desktopApp:packageReleaseDeb          # .deb  (or packageReleaseRpm / createReleaseDistributable)
 ```
 
-Packages land in `desktopApp/build/compose/binaries/main-release/`.
+## 🧩 Nyora on every platform
 
-## Releasing
+| Platform | Repo | Get it |
+|---|---|---|
+| 🐧 Linux | **nyora-linux** *(you are here)* | [deb · rpm · curl](https://github.com/Hasan72341/nyora-linux/releases/latest) |
+| 🤖 Android | [nyora-android](https://github.com/Hasan72341/nyora-android) | [APK](https://github.com/Hasan72341/nyora-android/releases/latest) |
+| 🪟 Windows | [nyora-windows](https://github.com/Hasan72341/nyora-windows) | [.exe (x64/ARM64)](https://github.com/Hasan72341/nyora-windows/releases/latest) |
+| 🍎 macOS | [nyora-mac](https://github.com/Hasan72341/nyora-mac) | [.dmg / `brew`](https://github.com/Hasan72341/nyora-mac/releases/latest) |
+| 📱 iOS / iPadOS | [nyora-ios](https://github.com/Hasan72341/nyora-ios) | [sideload IPA](https://github.com/Hasan72341/nyora-ios/releases/latest) |
+| 🌍 Web | — | [nyoraweb.pages.dev](https://nyoraweb.pages.dev) |
 
-Pushing a `v*` tag triggers [`.github/workflows/build-linux.yml`](.github/workflows/build-linux.yml), which builds the `.deb`, `.rpm`, and portable `.tar.gz` for x86_64 and arm64 and publishes them to a GitHub Release.
+## 🏗️ Tech
+
+Kotlin · **Compose Multiplatform for Desktop** · a shared Kotlin engine (`nyora-shared`) running the source parsers + a loopback REST API · jpackage `.deb`/`.rpm`/portable with a bundled JRE.
+
+## 🤝 Contributing
+
+Issues & PRs welcome. ⭐ **Star the repo** if you like Nyora!
+
+## 📄 License
+
+Licensed under the **Apache License 2.0** (see [`LICENSE`](LICENSE)). Original code, built from scratch — source-compatible with Tachiyomi/Kotatsu-style sources but not a fork.
+
+## 🙏 Credits
+
+Developed & maintained by **Md Hasan Raza** — [GitHub](https://github.com/Hasan72341) · [Instagram](https://instagram.com/md_hasan_raza____) · [LinkedIn](https://www.linkedin.com/in/md-hasan-raza) · hasanraza96@outlook.com
+
+> Nyora is not affiliated with any of the manga sources it can access.
