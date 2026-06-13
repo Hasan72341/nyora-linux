@@ -1,6 +1,19 @@
 # Nyora for Linux
 
-An AI-powered manga reader — the Linux desktop build of [Nyora](https://nyora.app), built with Compose Desktop. Ships with a bundled Java runtime, so there's nothing else to install.
+An AI-powered manga reader — the Linux desktop build of [Nyora](https://nyora.app), built with Compose Desktop over the shared Kotatsu engine. Ships with a bundled Java runtime, so there's nothing else to install.
+
+## Features
+
+- **Huge source catalogue** — browse, search and filter hundreds of online manga/manhwa/manhua sources via the shared Kotatsu parser engine.
+- **Standard & Webtoon reader** — paged (LTR/RTL) and vertical webtoon modes, zoom, double-page spreads and per-title settings.
+- **AI page translation** — translate a whole page at once: **Tesseract** OCR detects the text, which is then translated and typeset back over the art.
+- **Dynamic colour correction** — adjust brightness, contrast and colour filters live while reading.
+- **Library that stays organized** — favourites in custom categories, reading history, resume-where-you-left-off, and incognito mode.
+- **Offline downloads** — download chapters for offline reading.
+- **Tracker integration** — sync reading progress with online trackers.
+- **Backup & restore** — export/import your library.
+- **Cloud sync** — sign in with Google (loopback OAuth) and your library, favourites, categories, history and progress sync across all your Nyora devices (Supabase backend).
+- **Themes** — light / dark / system.
 
 ## Install
 
