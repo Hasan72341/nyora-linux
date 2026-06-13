@@ -24,6 +24,8 @@ import com.nyora.hasan72341.shared.proxy.NyoraRestServer
 import com.nyora.hasan72341.shared.reader.PageImageLoader
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import java.nio.file.Files
+import java.nio.file.Path
 
 /**
  * Register a freedesktop `.desktop` entry (+ icon) under ~/.local/share so Nyora
@@ -37,19 +39,18 @@ private fun ensureLinuxDesktopEntry() {
         if (!System.getProperty("os.name").orEmpty().lowercase().contains("linux")) return
         val appPath = System.getProperty("jpackage.app-path")?.takeIf { it.isNotBlank() } ?: return
         val home = System.getProperty("user.home")?.takeIf { it.isNotBlank() } ?: return
-        val fs = java.nio.file.Files
 
         // Icon → user icon theme.
-        val iconDir = java.nio.file.Path.of(home, ".local/share/icons/hicolor/512x512/apps")
-        fs.createDirectories(iconDir)
+        val iconDir = Path.of(home, ".local/share/icons/hicolor/512x512/apps")
+        Files.createDirectories(iconDir)
         val iconPath = iconDir.resolve("nyora.png")
-        if (!fs.exists(iconPath)) {
-            object {}.javaClass.getResourceAsStream("/nyora.png")?.use { ins -> fs.copy(ins, iconPath) }
+        if (!Files.exists(iconPath)) {
+            object {}.javaClass.getResourceAsStream("/nyora.png")?.use { ins -> Files.copy(ins, iconPath) }
         }
 
         // Desktop entry.
-        val appsDir = java.nio.file.Path.of(home, ".local/share/applications")
-        fs.createDirectories(appsDir)
+        val appsDir = Path.of(home, ".local/share/applications")
+        Files.createDirectories(appsDir)
         val entry = appsDir.resolve("nyora.desktop")
         val content = buildString {
             appendLine("[Desktop Entry]")
@@ -62,8 +63,8 @@ private fun ensureLinuxDesktopEntry() {
             appendLine("Terminal=false")
             appendLine("Categories=Graphics;Utility;Viewer;")
         }
-        if (!fs.exists(entry) || fs.readString(entry) != content) {
-            fs.writeString(entry, content)
+        if (!Files.exists(entry) || Files.readString(entry) != content) {
+            Files.writeString(entry, content)
         }
     }
 }
