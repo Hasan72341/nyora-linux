@@ -44,20 +44,27 @@ if command -v apt-get >/dev/null 2>&1 || command -v dpkg >/dev/null 2>&1; then
   fi
   say "Installed. Launch Nyora from your app menu or run: nyora"
 
-elif command -v dnf >/dev/null 2>&1 || command -v rpm >/dev/null 2>&1 || command -v zypper >/dev/null 2>&1; then
-  say "Fedora/RHEL/openSUSE family detected — installing the .rpm"
+# Trigger the RPM path on a real RPM package manager (dnf/yum/zypper), NOT a bare
+# `rpm` binary — Arch can have `rpm` installed for building and must not be treated
+# as an RPM system (it falls through to the portable build below).
+elif command -v dnf >/dev/null 2>&1 || command -v yum >/dev/null 2>&1 || command -v zypper >/dev/null 2>&1; then
+  say "Fedora/RHEL/Rocky/openSUSE family detected — installing the .rpm"
   fetch "${BASE}/Nyora-linux-${ARCH}.rpm" "$TMP/nyora.rpm"
   if command -v dnf >/dev/null 2>&1; then
     $SUDO dnf install -y "$TMP/nyora.rpm"
   elif command -v zypper >/dev/null 2>&1; then
     $SUDO zypper --non-interactive install --allow-unsigned-rpm "$TMP/nyora.rpm"
+  elif command -v yum >/dev/null 2>&1; then
+    $SUDO yum install -y "$TMP/nyora.rpm"
   else
     $SUDO rpm -i --force "$TMP/nyora.rpm"
   fi
   say "Installed. Launch Nyora from your app menu or run: nyora"
 
 else
-  say "No supported package manager found — installing the portable build to ~/.local"
+  # Arch / Manjaro (pacman) and any other distro — the portable build is glibc-based
+  # and runs anywhere, with its own bundled Java runtime.
+  say "Using the portable build (works on Arch, Manjaro & any other glibc distro) → ~/.local"
   fetch "${BASE}/Nyora-linux-${ARCH}-portable.tar.gz" "$TMP/nyora.tgz"
   DEST="$HOME/.local/opt/nyora"
   mkdir -p "$DEST"
