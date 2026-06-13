@@ -73,7 +73,13 @@ compose.desktop {
             jvmArgs(
                 // Allow GraalJS polyglot — needed when the sidecar runs in-process
                 "--add-opens", "java.base/jdk.internal.module=ALL-UNNAMED",
-                "-Xmx512m",
+                // 512m was too tight for Compose + image decoding + GraalJS and caused
+                // constant GC (high CPU). Give it room, use G1 (default on 17) and
+                // dedup strings + return freed memory to the OS to keep RSS down.
+                "-Xmx768m",
+                "-XX:+UseG1GC",
+                "-XX:+UseStringDeduplication",
+                "-XX:+ExitOnOutOfMemoryError",
             )
         }
 
