@@ -9,11 +9,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.WindowState
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
 import com.nyora.linux.ui.App
 import com.nyora.hasan72341.shared.HelperMain
 import com.nyora.hasan72341.shared.data.ExtensionInstaller
@@ -51,6 +53,17 @@ fun main() {
         // showQuitDialog tracks whether the confirmation AlertDialog is visible.
         var showQuitDialog by remember { mutableStateOf(false) }
 
+        // Size the window to the user's actual display so it never overflows on a
+        // small or HiDPI screen. WindowState is in dp and AWT's screenSize is in the
+        // same logical coordinate space, so fit to ~88% of it (always ≤ screen) and
+        // centre it. The minimum size is clamped to the screen too.
+        val screen = remember { java.awt.Toolkit.getDefaultToolkit().screenSize }
+        val windowState = rememberWindowState(
+            width = (screen.width * 0.88).toInt().coerceIn(880, 1760).coerceAtMost(screen.width - 40).dp,
+            height = (screen.height * 0.88).toInt().coerceIn(560, 1040).coerceAtMost(screen.height - 60).dp,
+            position = WindowPosition(Alignment.Center),
+        )
+
         Window(
             onCloseRequest = {
                 if (appState.confirmBeforeQuit) {
@@ -62,8 +75,16 @@ fun main() {
             },
             title = "Nyora",
             icon = painterResource("nyora.png"),
-            state = WindowState(width = 1280.dp, height = 800.dp),
+            state = windowState,
+            resizable = true,
         ) {
+            // Native minimum size, never larger than the screen itself.
+            LaunchedEffect(Unit) {
+                window.minimumSize = java.awt.Dimension(
+                    minOf(880, screen.width - 40),
+                    minOf(560, screen.height - 60),
+                )
+            }
             App(state = appState)
 
             // Confirmation dialog rendered inside the window's composition scope.
