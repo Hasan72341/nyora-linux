@@ -25,6 +25,49 @@ import com.nyora.hasan72341.shared.reader.PageImageLoader
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
+/**
+ * Register a freedesktop `.desktop` entry (+ icon) under ~/.local/share so Nyora
+ * appears in the Linux application menu no matter how it was installed (portable
+ * tarball, manual extract, …). `.deb`/`.rpm` already install one. Best-effort and
+ * idempotent: only runs for a packaged app (where `jpackage.app-path` is set), so
+ * `./gradlew run` is unaffected, and it never throws into the launch path.
+ */
+private fun ensureLinuxDesktopEntry() {
+    runCatching {
+        if (!System.getProperty("os.name").orEmpty().lowercase().contains("linux")) return
+        val appPath = System.getProperty("jpackage.app-path")?.takeIf { it.isNotBlank() } ?: return
+        val home = System.getProperty("user.home")?.takeIf { it.isNotBlank() } ?: return
+        val fs = java.nio.file.Files
+
+        // Icon → user icon theme.
+        val iconDir = java.nio.file.Path.of(home, ".local/share/icons/hicolor/512x512/apps")
+        fs.createDirectories(iconDir)
+        val iconPath = iconDir.resolve("nyora.png")
+        if (!fs.exists(iconPath)) {
+            object {}.javaClass.getResourceAsStream("/nyora.png")?.use { ins -> fs.copy(ins, iconPath) }
+        }
+
+        // Desktop entry.
+        val appsDir = java.nio.file.Path.of(home, ".local/share/applications")
+        fs.createDirectories(appsDir)
+        val entry = appsDir.resolve("nyora.desktop")
+        val content = buildString {
+            appendLine("[Desktop Entry]")
+            appendLine("Type=Application")
+            appendLine("Name=Nyora")
+            appendLine("GenericName=Manga Reader")
+            appendLine("Comment=AI-powered manga reader")
+            appendLine("Exec=\"$appPath\" %U")
+            appendLine("Icon=nyora")
+            appendLine("Terminal=false")
+            appendLine("Categories=Graphics;Utility;Viewer;")
+        }
+        if (!fs.exists(entry) || fs.readString(entry) != content) {
+            fs.writeString(entry, content)
+        }
+    }
+}
+
 fun main() {
     // ── Display scaling ───────────────────────────────────────────────────────
     // JBR/Skiko on some Linux setups mis-detect the display (e.g. GDK_SCALE=2 or a
@@ -36,6 +79,11 @@ fun main() {
         val override = System.getenv("NYORA_UI_SCALE")?.takeIf { it.isNotBlank() }
         System.setProperty("sun.java2d.uiScale", override ?: "1")
     }
+
+    // Make Nyora show up in the Linux application menu however it was installed
+    // (portable .tar.gz, etc.). .deb/.rpm register their own entry; this covers
+    // the rest. Best-effort + idempotent — never blocks launch.
+    ensureLinuxDesktopEntry()
 
     // Bootstrap the shared logic: DB, migrations, Supabase sync, and network config.
     // This ensures parity with the mac helper and deployable web targets.
