@@ -66,7 +66,24 @@ else
   BIN="$(find "$DEST/bin" -maxdepth 1 -type f | head -1)"
   [ -n "$BIN" ] || die "Portable archive did not contain a launcher."
   ln -sf "$BIN" "$HOME/.local/bin/nyora"
-  say "Installed to $DEST"
+
+  # Add an application-menu entry so Nyora shows in the launcher (the app also
+  # self-registers on first run; this makes it appear immediately).
+  APPS="$HOME/.local/share/applications"; mkdir -p "$APPS"
+  ICON="$(find "$DEST" -name '*.png' 2>/dev/null | head -1)"
+  cat > "$APPS/nyora.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Nyora
+GenericName=Manga Reader
+Comment=AI-powered manga reader
+Exec="$BIN" %U
+Icon=${ICON:-nyora}
+Terminal=false
+Categories=Graphics;Utility;Viewer;
+EOF
+  update-desktop-database "$APPS" >/dev/null 2>&1 || true
+  say "Installed to $DEST · added to your application menu"
   case ":$PATH:" in
     *":$HOME/.local/bin:"*) say "Run: nyora" ;;
     *) say "Run: ~/.local/bin/nyora  (add ~/.local/bin to your PATH to use 'nyora' directly)" ;;
