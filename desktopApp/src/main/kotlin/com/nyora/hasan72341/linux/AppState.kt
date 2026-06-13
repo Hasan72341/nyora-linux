@@ -1705,7 +1705,7 @@ class AppState(
         }
     }
 
-    private fun openExternalUrl(url: String) {
+    fun openExternalUrl(url: String) {
         // Use the OS-native opener FIRST. Desktop.getDesktop().browse() must run on
         // the AWT event thread — calling it from Dispatchers.IO (as the OAuth flow
         // does) hangs/no-ops on macOS, so the browser never opened. `open`/`xdg-open`/

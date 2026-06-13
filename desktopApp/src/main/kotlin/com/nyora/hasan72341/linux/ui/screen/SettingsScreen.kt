@@ -666,6 +666,15 @@ private fun SettingsDetail(state: AppState, key: String, onBack: () -> Unit) {
                 }
             }
             HairlineDivider()
+            SettingsRow("Website") {
+                Text(
+                    "nyora.pages.dev",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LocalNyoraAccent.current.color,
+                    modifier = Modifier.clickable { state.openExternalUrl("https://nyora.pages.dev") },
+                )
+            }
+            HairlineDivider()
             SettingsRow("Platform") {
                 Text(
                     "${System.getProperty("os.name")} (${System.getProperty("os.arch")})",
