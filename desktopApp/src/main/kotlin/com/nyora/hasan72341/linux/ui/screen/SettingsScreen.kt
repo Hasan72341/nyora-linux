@@ -675,6 +675,15 @@ private fun SettingsDetail(state: AppState, key: String, onBack: () -> Unit) {
                 )
             }
             HairlineDivider()
+            SettingsRow("GitHub") {
+                Text(
+                    "Hasan72341/nyora-linux",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LocalNyoraAccent.current.color,
+                    modifier = Modifier.clickable { state.openExternalUrl("https://github.com/Hasan72341/nyora-linux") },
+                )
+            }
+            HairlineDivider()
             SettingsRow("Platform") {
                 Text(
                     "${System.getProperty("os.name")} (${System.getProperty("os.arch")})",
