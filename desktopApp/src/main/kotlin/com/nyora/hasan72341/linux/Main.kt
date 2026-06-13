@@ -26,6 +26,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
 fun main() {
+    // ── Display scaling ───────────────────────────────────────────────────────
+    // JBR/Skiko on some Linux setups mis-detect the display (e.g. GDK_SCALE=2 or a
+    // high Xft.dpi) and render the whole UI at 200%. Force 1:1 by default so the UI
+    // is the expected size; this MUST run before any AWT/Java2D init (i.e. first
+    // thing in main). Users on a genuine HiDPI panel can opt back into scaling with
+    // NYORA_UI_SCALE=2 (or -Dsun.java2d.uiScale=2), which is respected here.
+    if (System.getProperty("sun.java2d.uiScale").isNullOrBlank()) {
+        val override = System.getenv("NYORA_UI_SCALE")?.takeIf { it.isNotBlank() }
+        System.setProperty("sun.java2d.uiScale", override ?: "1")
+    }
+
     // Bootstrap the shared logic: DB, migrations, Supabase sync, and network config.
     // This ensures parity with the mac helper and deployable web targets.
     val boot = HelperMain.bootstrap()
