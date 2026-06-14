@@ -167,7 +167,7 @@ fun ReaderScreen(state: AppState) {
     LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
 
     // Determine background color from the global readerBackground setting.
-    // "dark" and "auto" both use pure black (AMOLED); "light" uses the theme surface.
+    // "dark" and "auto" both use pure black for reading; "light" uses the theme surface.
     val readerBgColor = if (state.readerBackground == "light") NyoraTokens.bg else Color(0xFF000000)
 
     Box(
@@ -612,7 +612,11 @@ private fun PagedReader(
         reverseLayout = reverseLayout,
         modifier = Modifier.fillMaxSize(),
         pageSpacing = 0.dp,
-        beyondViewportPageCount = 1
+        // Prefetch the next/previous pages so Coil concurrently fetches and decodes
+        // them before the user swipes — each SubcomposeAsyncImage still loads
+        // independently (a slow page never blocks the reader). Bounded to a small
+        // window; gated behind the user's prefetch toggle.
+        beyondViewportPageCount = if (state.prefetchEnabled) 2 else 1
     ) { index ->
         val isCurrent = index == pagerState.currentPage
         // The remembered gesture-state lambda must read the *latest* lifted zoom/pan, so we

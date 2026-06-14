@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import com.nyora.linux.ui.GoogleLogo
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.rounded.AutoStories
 import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Cloud
@@ -233,7 +235,7 @@ private fun SettingsDetail(state: AppState, key: String, onBack: () -> Unit) {
 
         // (1) APPEARANCE ──────────────────────────────────────────────────────────────────
         if (key == "appearance") SettingsSection(eyebrow = "Look & Feel", title = "Appearance", icon = Icons.Rounded.Palette) {
-            // Theme — Amoled / Light segmented control with accentGradientSubtle on selected
+            // Theme — Dark / Light segmented control with accentGradientSubtle on selected
             SettingsRow("Theme") {
                 AppearanceSegmented(
                     selected  = state.appearance,
@@ -241,17 +243,18 @@ private fun SettingsDetail(state: AppState, key: String, onBack: () -> Unit) {
                 )
             }
             HairlineDivider()
-            // Accent swatches
+            // Color scheme preview cards
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp)) {
                 Text(
-                    "Accent",
+                    "Color scheme",
                     style = MaterialTheme.typography.bodyLarge,
                     color = NyoraTokens.onSurfaceHigh,
                 )
                 Spacer(Modifier.height(14.dp))
                 AccentSwatchRow(
-                    selected = state.accent,
-                    onSelect = { state.setAccent(it) },
+                    selected   = state.accent,
+                    appearance = state.appearance,
+                    onSelect   = { state.setAccent(it) },
                 )
             }
             HairlineDivider()
@@ -1047,7 +1050,7 @@ private fun SliderRow(
     }
 }
 
-// ── Appearance segmented control (Amoled / Light) ──────────────────────────────────
+// ── Appearance segmented control (Dark / Light) ──────────────────────────────────
 //
 // Uses accentGradientSubtle() as the fill of the selected segment, matching the
 // design-language rule: "accentGradientSubtle on selected chips/segmented fills".
@@ -1070,8 +1073,8 @@ private fun AppearanceSegmented(
         AppearanceMode.entries.forEach { mode ->
             val isSelected = mode == selected
             val label = when (mode) {
-                AppearanceMode.AMOLED -> "Amoled"
-                AppearanceMode.LIGHT  -> "Light"
+                AppearanceMode.DARK  -> "Dark"
+                AppearanceMode.LIGHT -> "Light"
             }
             Box(
                 modifier = Modifier
@@ -1216,17 +1219,27 @@ private fun <T> NyoraDropdown(
     }
 }
 
-// ── Accent swatch row ───────────────────────────────────────────────────────────────
+// ── Color-scheme preview cards ────────────────────────────────────────────────────────
 
+/**
+ * A horizontally-scrolling row of android-style preview cards (mirrors
+ * `item_color_scheme.xml`): one card per named [Accent] scheme, each rendered for the
+ * active [appearance] so the swatch shows the correct light/dark primary.
+ */
 @Composable
 private fun AccentSwatchRow(
     selected: Accent,
+    appearance: AppearanceMode,
     onSelect: (Accent) -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+    Row(
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Accent.entries.forEach { accent ->
-            AccentSwatch(
+            SchemePreviewCard(
                 accent     = accent,
+                appearance = appearance,
                 isSelected = accent == selected,
                 onClick    = { onSelect(accent) },
             )
@@ -1234,44 +1247,114 @@ private fun AccentSwatchRow(
     }
 }
 
+/**
+ * A single themed preview card: a mini surface drawn in the scheme's own tones with an
+ * "Abc" label, two secondary-tone bars, a primary swatch bottom-end, a check when selected,
+ * and the scheme [Accent.label] beneath — faithful to nyora-android's `item_color_scheme`.
+ */
 @Composable
-private fun AccentSwatch(
+private fun SchemePreviewCard(
     accent: Accent,
+    appearance: AppearanceMode,
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
-    val size by androidx.compose.animation.core.animateDpAsState(
-        targetValue    = if (isSelected) 38.dp else 32.dp,
-        animationSpec  = androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 300f),
-        label          = "swatchSize",
+    val light     = appearance == AppearanceMode.LIGHT
+    val primary   = accent.primary(appearance)
+    // The card draws on a derived mini surface so each scheme reads as its own theme.
+    val cardSurface = if (light) Color(0xFFF5F3F7) else Color(0xFF1F1F26)
+    val onCard      = if (light) Color(0xFF1A1A1C) else NyoraTokens.onSurfaceHigh
+    // Spec gives only a dark secondary; for light derive a muted variant of the primary.
+    val secondary   = if (light) primary.copy(alpha = 0.35f) else accent.darkSecondary
+    val cardShape   = RoundedCornerShape(14.dp)
+
+    val borderColor = if (isSelected) primary else NyoraTokens.hairlineStrong
+    val borderWidth by androidx.compose.animation.core.animateDpAsState(
+        targetValue   = if (isSelected) 2.dp else 1.dp,
+        animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 300f),
+        label         = "schemeBorder",
     )
-    Box(
+
+    Column(
         modifier = Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center,
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onClick() }
+            .padding(4.dp),
+        horizontalAlignment = Alignment.Start,
     ) {
-        if (isSelected) {
+        Box(
+            modifier = Modifier
+                .size(width = 96.dp, height = 128.dp)
+                .clip(cardShape)
+                .background(cardSurface)
+                .then(
+                    if (isSelected) Modifier.glowBorder(color = primary, shape = cardShape)
+                    else Modifier.border(width = borderWidth, color = borderColor, shape = cardShape)
+                ),
+        ) {
+            // "Abc" sample text, top-start.
+            Text(
+                "Abc",
+                style = MaterialTheme.typography.labelMedium,
+                color = onCard,
+                modifier = Modifier.align(Alignment.TopStart).padding(start = 8.dp, top = 10.dp),
+            )
+            // Two secondary-tone bars, lower-left stacked.
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 8.dp, bottom = 30.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 32.dp, height = 6.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(secondary),
+                )
+                Box(
+                    modifier = Modifier
+                        .size(width = 56.dp, height = 6.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(secondary),
+                )
+            }
+            // Primary swatch, bottom-end.
             Box(
                 modifier = Modifier
-                    .size(size)
-                    .clip(CircleShape)
-                    .background(accent.color)
-                    .glowBorder(color = accent.color, shape = CircleShape),
+                    .align(Alignment.BottomEnd)
+                    .padding(8.dp)
+                    .size(16.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(primary),
             )
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(size)
-                    .clip(CircleShape)
-                    .background(accent.color)
-                    .border(
-                        width = 1.dp,
-                        color = NyoraTokens.hairlineStrong,
-                        shape = CircleShape,
-                    ),
-            )
+            // Check, top-end when selected.
+            if (isSelected) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .background(primary),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Check,
+                        contentDescription = null,
+                        tint = if (light) Color.White else Color(0xFF0E0E12),
+                        modifier = Modifier.size(12.dp),
+                    )
+                }
+            }
         }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            accent.label,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (isSelected) primary else NyoraTokens.onSurfaceHigh,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            modifier = Modifier.padding(start = 2.dp),
+        )
     }
 }
