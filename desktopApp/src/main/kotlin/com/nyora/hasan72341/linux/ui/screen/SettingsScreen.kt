@@ -675,7 +675,7 @@ private fun SettingsDetail(state: AppState, key: String, onBack: () -> Unit) {
                 )
             }
             HairlineDivider()
-            SettingsRow("GitHub") {
+            SettingsRow("Source code") {
                 Text(
                     "Hasan72341/nyora-linux",
                     style = MaterialTheme.typography.labelSmall,
@@ -705,6 +705,68 @@ private fun SettingsDetail(state: AppState, key: String, onBack: () -> Unit) {
                     text = SqlDelightLibraryRepository.defaultDatabasePath().toString(),
                     style = MaterialTheme.typography.bodySmall,
                     color = NyoraTokens.onSurfaceFaint,
+                )
+            }
+            HairlineDivider()
+            SettingsRow("Developer") {
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        "Md Hasan Raza",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = NyoraTokens.onSurfaceHigh,
+                    )
+                    Text(
+                        "Creator of Nyora",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = NyoraTokens.onSurfaceMuted,
+                    )
+                }
+            }
+            HairlineDivider()
+            SettingsRow("Instagram") {
+                Text(
+                    "@md_hasan_raza____",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LocalNyoraAccent.current.color,
+                    modifier = Modifier.clickable { state.openExternalUrl("https://www.instagram.com/md_hasan_raza____?igsh=MXZ6eTk2Y3FsNGs3aQ==") },
+                )
+            }
+            HairlineDivider()
+            SettingsRow("LinkedIn") {
+                Text(
+                    "md-hasan-raza",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LocalNyoraAccent.current.color,
+                    modifier = Modifier.clickable { state.openExternalUrl("https://www.linkedin.com/in/md-hasan-raza-8817372a7/") },
+                )
+            }
+            HairlineDivider()
+            SettingsRow("GitHub") {
+                Text(
+                    "Hasan72341",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LocalNyoraAccent.current.color,
+                    modifier = Modifier.clickable { state.openExternalUrl("https://github.com/Hasan72341") },
+                )
+            }
+            HairlineDivider()
+            SettingsRow("Email") {
+                Text(
+                    "hasanraza96@outlook.com",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LocalNyoraAccent.current.color,
+                    modifier = Modifier.clickable { state.openExternalUrl("mailto:hasanraza96@outlook.com") },
+                )
+            }
+            HairlineDivider()
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 6.dp),
+            ) {
+                Text(
+                    "Nyora — your manga library, everywhere. Available on Android, Windows, macOS, Linux, iOS and the web.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NyoraTokens.onSurfaceMuted,
                 )
             }
         }
