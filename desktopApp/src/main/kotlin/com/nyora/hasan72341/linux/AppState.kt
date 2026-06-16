@@ -1743,8 +1743,13 @@ class AppState(
             }
             withContext(Dispatchers.Main) { signInUrl = authUrl }
             openExternalUrl(authUrl)
-
-            val code = result.get(180, TimeUnit.SECONDS).getOrThrow()
+            showStatus("Waiting for Google sign-in in your browser…")
+            val outcome = try {
+                result.get(180, TimeUnit.SECONDS)
+            } catch (e: java.util.concurrent.TimeoutException) {
+                error("Timed out waiting for the browser to return. If Google showed \"Access blocked\" or stayed on a Google page, this app's Google sign-in still needs to be published in Google Cloud Console (OAuth consent screen → Publish app).")
+            }
+            val code = outcome.getOrThrow()
 
             val tokenFormBuilder = FormBody.Builder()
                 .add("client_id", clientId)

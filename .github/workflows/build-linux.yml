@@ -43,6 +43,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y rpm fakeroot binutils
 
+      # Bake the OAuth client secret into the app resources (gitignored) so
+      # Google sign-in works on end-user machines (no env var / .env.sync there).
+      - name: Bake OAuth secret
+        run: |
+          mkdir -p desktopApp/src/main/resources
+          printf 'GOOGLE_CLIENT_SECRET=%s\n' "$GOOGLE_CLIENT_SECRET" > desktopApp/src/main/resources/nyora-oauth.properties
+          [ -z "$GOOGLE_CLIENT_SECRET" ] && echo "::warning::GOOGLE_CLIENT_SECRET secret is empty — Google sign-in will not work in this build."
+        env:
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+
       - name: Build .deb, .rpm and portable app image
         run: |
           chmod +x ./gradlew
