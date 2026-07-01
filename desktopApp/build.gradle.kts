@@ -20,6 +20,11 @@ dependencies {
 
     implementation("org.jsoup:jsoup:1.17.2")
 
+    // Embedded Chromium (KCEF/JCEF) driving the in-app Cloudflare solver's WebView.
+    // 1.9.40 targets Compose 1.7.x (matches the forced 1.7.3 below) and pulls
+    // dev.datlag:kcef transitively. First run downloads a Chromium bundle.
+    implementation("io.github.kevinnzou:compose-webview-multiplatform:1.9.40")
+
     // Image loading — Coil3 with OkHttp on desktop
     implementation("io.coil-kt.coil3:coil-compose:3.0.4")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
