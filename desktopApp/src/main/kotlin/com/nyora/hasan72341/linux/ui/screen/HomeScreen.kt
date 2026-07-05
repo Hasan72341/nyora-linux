@@ -72,7 +72,7 @@ fun HomeScreen(state: AppState) {
             Spacer(Modifier.height(16.dp))
             SectionHeader(
                 title = "Discover",
-                subtitle = "Trending on AniList",
+                subtitle = "Popular on MangaBaka",
                 modifier = Modifier.padding(bottom = 8.dp)
             )
         }

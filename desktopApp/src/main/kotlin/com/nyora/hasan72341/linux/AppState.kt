@@ -17,8 +17,11 @@ import com.nyora.linux.bridge.LocalScanResponse
 import com.nyora.linux.bridge.NyoraHttpClient
 import com.nyora.linux.bridge.AlternativesResponse
 import com.nyora.linux.bridge.AniListFeedMedia
-import com.nyora.linux.bridge.AniListFeedResponse
 import com.nyora.linux.bridge.AniListSearchResponse
+import com.nyora.linux.bridge.MangaBakaSearchResponse
+import com.nyora.linux.bridge.mbPopularity
+import com.nyora.linux.bridge.mbUsable
+import com.nyora.linux.bridge.toFeedMedia
 import com.nyora.linux.bridge.DownloadSettingsDto
 import com.nyora.linux.bridge.DownloadSettingsResponse
 import com.nyora.linux.bridge.MangaPrefsDto
@@ -1656,41 +1659,47 @@ class AppState(
         }
     }
 
-    // ── "For You" feed (AniList trending) ────────────────────────────────────────
+    // ── "For You" feed (MangaBaka discovery) ─────────────────────────────────────
     //
-    // Mirrors nyora-android's AnilistRepository: a DIRECT POST to the public
-    // AniList GraphQL API (https://graphql.anilist.co) — NOT the Nyora proxy and
-    // NOT imageBaseUrl. No Authorization header (this endpoint needs none). We
-    // reuse the existing `authHttp` OkHttp client for its timeouts but build a
-    // plain request without a bearer token.
+    // AniList disabled its public API, so the Discover feed now comes from the
+    // MangaBaka series database (https://api.mangabaka.dev) — NOT the Nyora proxy
+    // and NOT imageBaseUrl. MangaBaka is search-first (no trending endpoint), so
+    // we fetch a broad manga search (`q=a`), keep only safe content, filter out
+    // junk/placeholder entries, then rank client-side by global popularity and
+    // map onto the existing AniList feed shape. We reuse the existing `authHttp`
+    // OkHttp client for its timeouts; this call needs no Authorization header.
 
     fun loadAnilistFeed() {
         if (anilistFeed.isNotEmpty()) return // already loaded; avoid refetch
         anilistFeedLoading = true
         scope.launch {
             runCatching {
-                val query = """
-                    query { Page(page: 1, perPage: 30) { media(type: MANGA, sort: TRENDING_DESC) { id title { romaji english native } coverImage { extraLarge large } description averageScore genres } } }
-                """.trimIndent()
-                val payload = prefsJson.encodeToString(
-                    AniListQueryBody.serializer(), AniListQueryBody(query = query),
-                )
+                val url = "https://api.mangabaka.dev/v1/series/search" +
+                    "?q=a&type=manga&content_rating=safe&limit=30"
                 val raw = withContext(Dispatchers.IO) {
                     val req = Request.Builder()
-                        .url("https://graphql.anilist.co")
-                        .header("Content-Type", "application/json")
-                        .post(payload.toRequestBody("application/json".toMediaType()))
+                        .url(url)
+                        .header("Accept", "application/json")
+                        .get()
                         .build()
-                    authHttp.newCall(req).execute().use { it.body!!.string() }
+                    authHttp.newCall(req).execute().use { resp ->
+                        if (!resp.isSuccessful) error("HTTP ${resp.code}")
+                        resp.body!!.string()
+                    }
                 }
-                val resp = prefsJson.decodeFromString<AniListFeedResponse>(raw)
-                withContext(Dispatchers.Main) { anilistFeed = resp.data.Page.media }
+                val parsed = prefsJson.decodeFromString<MangaBakaSearchResponse>(raw)
+                val media = parsed.data
+                    .filter { it.mbUsable() }
+                    .sortedByDescending { it.mbPopularity() }
+                    .take(24)
+                    .map { it.toFeedMedia() }
+                withContext(Dispatchers.Main) { anilistFeed = media }
             }.onFailure { showStatus("Discover feed failed: ${it.message}") }
             anilistFeedLoading = false
         }
     }
 
-    /** Best display title for an AniList feed media item. */
+    /** Best display title for a discovery feed media item. */
     fun anilistFeedTitle(m: AniListFeedMedia): String =
         m.title.english ?: m.title.romaji ?: m.title.native ?: "Untitled"
 
@@ -2088,9 +2097,6 @@ class AppState(
         val error: String = "",
         val error_description: String = "",
     )
-
-    @Serializable
-    private data class AniListQueryBody(val query: String = "")
 
     private companion object {
         private const val DESKTOP_GOOGLE_CLIENT_ID = "181067068545-5r2ob1jv4mc0v8gd52fgk2jt28pk3370.apps.googleusercontent.com"
