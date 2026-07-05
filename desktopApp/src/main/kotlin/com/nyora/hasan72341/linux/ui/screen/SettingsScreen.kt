@@ -451,6 +451,12 @@ private fun SettingsDetail(state: AppState, key: String, onBack: () -> Unit) {
             // Hide NSFW content (existing)
             SettingsToggle("Hide NSFW Content", state.nsfwFilter) { state.nsfwFilter = it }
             HairlineDivider()
+            // Keep 18+ out of history
+            SettingsToggle("Keep 18+ out of history", state.noNsfwHistory) {
+                state.noNsfwHistory = it
+                state.persistSettings()
+            }
+            HairlineDivider()
             // Hide NSFW sources (new)
             SettingsToggle("Hide NSFW Sources", state.hideNsfwSources) {
                 state.hideNsfwSources = it
