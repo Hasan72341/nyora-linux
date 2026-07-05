@@ -15,7 +15,7 @@
         # ── Release coordinates ────────────────────────────────────────────────
         # Bump `version` per release and fill the matching sha256 for your arch.
         # Get a hash with:  nix store prefetch-file <url>   (or nix-prefetch-url)
-        version = "1.0.0";
+        version = "2.0.0";
 
         debUrlFor = arch:
           "https://github.com/Hasan72341/nyora-linux/releases/download/v${version}/Nyora-linux-${arch}.deb";
