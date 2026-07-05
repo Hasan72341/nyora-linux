@@ -112,6 +112,11 @@ class AppState(
     // First-run welcome (gated by a marker file in the config dir).
     var showWelcome  by mutableStateOf(false)
 
+    /** When true, the content & language preferences step is re-opened as an
+     *  overlay (from Settings ▸ "Re-run setup") so the user can re-pick languages /
+     *  the 18+ preference and reseed their sources after onboarding. */
+    var showPreferences by mutableStateOf(false)
+
     // ── Explore ───────────────────────────────────────────────────────────────
     var sources          by mutableStateOf<List<MangaSource>>(emptyList())
     var activeSource     by mutableStateOf<MangaSource?>(null)
@@ -367,6 +372,32 @@ class AppState(
                 }
                 showStatus("Installed.")
             }.onFailure { showStatus("Install failed: ${it.message}") }
+        }
+    }
+
+    /**
+     * Seed the installed shelf from the onboarding / preferences step: install
+     * every catalog [ids] entry that isn't already installed, in one coroutine,
+     * then refresh once. Best-effort — a failed install is skipped so one bad
+     * source can't abort the whole seed. Never leaves the shelf empty because the
+     * caller falls back to the 18+-only set when the language filter matches none.
+     */
+    fun seedSources(ids: List<String>) {
+        if (ids.isEmpty()) return
+        scope.launch {
+            val alreadyInstalled = sources.filter { it.isInstalled }.map { it.id }.toSet()
+            val todo = ids.filter { it !in alreadyInstalled }
+            withContext(Dispatchers.IO) {
+                todo.forEach { id ->
+                    runCatching { http.post("/sources/install?id=${URLEncoder.encode(id, "UTF-8")}") }
+                }
+            }
+            loadSources()
+            val want = ids.toSet()
+            catalogEntries = catalogEntries.map {
+                if (it.id in want) it.copy(isInstalled = true) else it
+            }
+            if (todo.isNotEmpty()) showStatus("Added ${todo.size} source${if (todo.size == 1) "" else "s"}.")
         }
     }
 

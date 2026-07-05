@@ -457,10 +457,15 @@ private fun SettingsDetail(state: AppState, key: String, onBack: () -> Unit) {
                 state.persistSettings()
             }
             HairlineDivider()
-            // Hide NSFW sources (new)
-            SettingsToggle("Hide NSFW Sources", state.hideNsfwSources) {
-                state.hideNsfwSources = it
+            // Show 18+ sources (inverse of hideNsfwSources)
+            SettingsToggle("Show 18+ Sources", !state.hideNsfwSources) {
+                state.hideNsfwSources = !it
                 state.persistSettings()
+            }
+            HairlineDivider()
+            // Re-open the onboarding preferences step (languages + 18+) to reseed sources.
+            SettingsRow("Content & language preferences") {
+                Button(onClick = { state.showPreferences = true }) { Text("Re-run setup") }
             }
             HairlineDivider()
             // History retention slider 0-365 step 30

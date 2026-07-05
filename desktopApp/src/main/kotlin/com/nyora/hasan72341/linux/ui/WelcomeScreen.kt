@@ -2,32 +2,29 @@ package com.nyora.linux.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,22 +33,38 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nyora.linux.AppState
+import com.nyora.linux.bridge.CatalogEntry
 import com.nyora.linux.ui.theme.LocalNyoraAccent
 import com.nyora.linux.ui.theme.NyoraTokens
+import com.nyora.linux.ui.theme.glassCard
 
-/** First-run start page: brand, a line of intent, and the two ways in —
- *  sign in (carry your library across devices) or continue as a guest. */
+/**
+ * First-run onboarding — a two-layer flow:
+ *  Layer 1 (auth): brand, a line of intent, and the two ways in — sign in (carry
+ *  your library across devices) or continue as a guest.
+ *  Layer 2 (prefs): once you're in, a "Set up your shelf" card — languages + the
+ *  18+ source preference — then Start reading seeds the matching sources and
+ *  finishes onboarding.
+ */
 @Composable
 fun WelcomeScreen(state: AppState) {
     val accent = LocalNyoraAccent.current.color
     val busy = state.cloudSyncBusy
-    // Keep the welcome up while Google sign-in runs; dismiss only once it succeeds.
+    // Keep the welcome up while Google sign-in runs; move on to prefs once it succeeds.
     val authed = state.cloudSyncStatus?.isAuthenticated == true
-    LaunchedEffect(authed) { if (authed) state.finishOnboarding() }
+
+    // "auth" → the sign-in stage; "prefs" → the preferences stage. Everyone passes
+    // through prefs (guest directly; signed-in/created after auth succeeds) so the
+    // Start-reading CTA is the single point that finishes onboarding.
+    var stage by remember { mutableStateOf("auth") }
+
+    LaunchedEffect(authed) { if (authed) stage = "prefs" }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -66,117 +79,425 @@ fun WelcomeScreen(state: AppState) {
                 .height(320.dp)
                 .background(Brush.verticalGradient(listOf(accent.copy(alpha = 0.12f), Color.Transparent))),
         )
-        Column(
-            modifier = Modifier.widthIn(max = 430.dp).padding(horizontal = 40.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+
+        when (stage) {
+            "prefs" -> PreferencesStage(state, accent, onDone = { state.finishOnboarding() })
+            else -> AuthStage(
+                state = state, accent = accent, busy = busy,
+                onGuest = { stage = "prefs" },
+            )
+        }
+    }
+}
+
+/**
+ * Re-run of the content & language preferences step, opened from Settings as a
+ * full-screen overlay (see [AppState.showPreferences]). Reuses [PreferencesStage]
+ * with re-run copy; "Save & apply" reseeds sources and dismisses. A top "Close"
+ * bails out without changing anything.
+ */
+@Composable
+fun PreferencesOverlay(state: AppState) {
+    val accent = LocalNyoraAccent.current.color
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(Color(0xFF0B0707), NyoraTokens.bg, Color.Black))),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier.align(Alignment.TopCenter).fillMaxWidth().height(320.dp)
+                .background(Brush.verticalGradient(listOf(accent.copy(alpha = 0.12f), Color.Transparent))),
+        )
+        TextButton(
+            onClick = { state.showPreferences = false },
+            modifier = Modifier.align(Alignment.TopEnd).padding(20.dp),
+        ) { Text("Close", color = NyoraTokens.onSurfaceMuted, fontSize = 14.sp) }
+
+        PreferencesStage(
+            state = state, accent = accent,
+            kicker = "PREFERENCES",
+            title = "Languages & sources",
+            sub = "Re-pick the languages you read and your content preference — this reseeds your installed sources.",
+            cta = "Save & apply",
+            onDone = { state.showPreferences = false },
+        )
+    }
+}
+
+// ── Layer 1 · auth ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun AuthStage(state: AppState, accent: Color, busy: Boolean, onGuest: () -> Unit) {
+    Column(
+        modifier = Modifier.widthIn(max = 430.dp).padding(horizontal = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Image(
+            painter = painterResource("nyora_logo.png"),
+            contentDescription = "Nyora",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.size(96.dp).clip(CircleShape),
+        )
+        Spacer(Modifier.height(28.dp))
+        Text(
+            "破壊 · Manga, anywhere the night takes you",
+            color = accent,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 2.5.sp,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(20.dp))
+        Text(
+            "NYORA",
+            color = NyoraTokens.onSurfaceHigh,
+            fontSize = 60.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 3.sp,
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            "Read like the world can wait.",
+            color = NyoraTokens.onSurfaceHigh,
+            fontSize = 23.sp,
+            fontWeight = FontWeight.Light,
+            textAlign = TextAlign.Center,
+            lineHeight = 31.sp,
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            "Nyora pulls hundreds of sources into one quiet shelf and remembers exactly where you stopped — on your phone, your tablet, your desk. Sign in to sync and back it up, or just start reading.",
+            color = NyoraTokens.onSurfaceMuted,
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center,
+            lineHeight = 21.sp,
+        )
+        Spacer(Modifier.height(28.dp))
+        var email by remember { mutableStateOf("") }
+        var password by remember { mutableStateOf("") }
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Email") },
+            singleLine = true,
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(10.dp))
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Password") },
+            singleLine = true,
+            enabled = !busy,
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = { state.cloudSignIn(email, password) },
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.White),
         ) {
-            Image(
-                painter = painterResource("nyora_logo.png"),
-                contentDescription = "Nyora",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(96.dp).clip(CircleShape),
-            )
-            Spacer(Modifier.height(28.dp))
+            Text(if (busy) "Signing in…" else "Sign in", fontWeight = FontWeight.SemiBold)
+        }
+        Spacer(Modifier.height(10.dp))
+        OutlinedButton(
+            onClick = { state.cloudRegister(email, password) },
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape = RoundedCornerShape(14.dp),
+        ) {
+            Text("Create account")
+        }
+        Spacer(Modifier.height(10.dp))
+        TextButton(
+            onClick = onGuest,
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth().height(46.dp),
+        ) {
+            Text("Continue as guest", color = NyoraTokens.onSurfaceMuted, fontSize = 14.sp)
+        }
+        // Fallback for multi-display/Spaces macOS, where the browser tab can open
+        // on a screen you're not looking at.
+        if (state.signInUrl != null) {
+            Spacer(Modifier.height(18.dp))
             Text(
-                "破壊 · Manga, anywhere the night takes you",
+                "Browser didn't appear? The sign-in link is copied to your clipboard.",
+                color = NyoraTokens.onSurfaceFaint,
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center,
+                lineHeight = 17.sp,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Open sign-in page again",
                 color = accent,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                letterSpacing = 2.5.sp,
-                textAlign = TextAlign.Center,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickable { state.reopenSignInUrl() },
             )
-            Spacer(Modifier.height(20.dp))
-            Text(
-                "NYORA",
-                color = NyoraTokens.onSurfaceHigh,
-                fontSize = 60.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 3.sp,
-            )
-            Spacer(Modifier.height(16.dp))
-            Text(
-                "Read like the world can wait.",
-                color = NyoraTokens.onSurfaceHigh,
-                fontSize = 23.sp,
-                fontWeight = FontWeight.Light,
-                textAlign = TextAlign.Center,
-                lineHeight = 31.sp,
-            )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                "Nyora pulls hundreds of sources into one quiet shelf and remembers exactly where you stopped — on your phone, your tablet, your desk. Sign in to sync and back it up, or just start reading.",
-                color = NyoraTokens.onSurfaceMuted,
-                fontSize = 14.sp,
-                textAlign = TextAlign.Center,
-                lineHeight = 21.sp,
-            )
-            Spacer(Modifier.height(28.dp))
-            var email by remember { mutableStateOf("") }
-            var password by remember { mutableStateOf("") }
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                label = { Text("Email") },
-                singleLine = true,
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Password") },
-                singleLine = true,
-                enabled = !busy,
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(16.dp))
-            Button(
-                onClick = { state.cloudSignIn(email, password) },
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.White),
-            ) {
-                Text(if (busy) "Signing in…" else "Sign in", fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+// ── Layer 2 · preferences ────────────────────────────────────────────────────────
+
+@Composable
+private fun PreferencesStage(
+    state: AppState,
+    accent: Color,
+    onDone: () -> Unit,
+    kicker: String = "YOU’RE IN",
+    title: String = "Set up your shelf",
+    sub: String = "Choose your languages and content preference — we’ll line up the matching " +
+        "sources. You can change any of this later in Settings.",
+    cta: String = "Start reading",
+) {
+    // "Show 18+ sources" is the inverse of hideNsfwSources (default hidden).
+    var show18 by remember { mutableStateOf(!state.hideNsfwSources) }
+    // Selected language codes; empty ⇒ all languages (mirrors the web onboarding).
+    val selectedLangs = remember { mutableStateListOf<String>() }
+
+    // Ensure the catalog is loaded before the language selector renders. loadCatalog
+    // no-ops (empty) when no source repository is active — the stage then degrades to
+    // just the 18+ toggle and the user can still finish (defaults preserved).
+    LaunchedEffect(Unit) {
+        if (state.catalogEntries.isEmpty() && !state.catalogLoading) state.loadCatalog()
+    }
+
+    val entries = state.catalogEntries
+    val langOptions = remember(entries) { languageOptions(entries) }
+
+    // A source matches iff its language is selected (or no language filter is set)
+    // AND it passes the 18+ gate. Empty match ⇒ fall back to the 18+-only set so the
+    // shelf is never seeded empty.
+    fun matchedIds(): List<String> = entries
+        .filter { (selectedLangs.isEmpty() || selectedLangs.contains(it.lang.lowercase())) && (show18 || !it.isNsfw) }
+        .map { it.id }
+    val fallbackCount = entries.count { show18 || !it.isNsfw }
+    val addCount = matchedIds().size.takeIf { it > 0 } ?: fallbackCount
+
+    Column(
+        modifier = Modifier.widthIn(max = 460.dp).fillMaxHeight().padding(40.dp)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Spacer(Modifier.weight(1f))
+        Text(kicker, color = accent, fontSize = 11.sp, fontWeight = FontWeight.Medium,
+            letterSpacing = 2.5.sp)
+        Spacer(Modifier.height(14.dp))
+        Text(title, color = NyoraTokens.onSurfaceHigh, fontSize = 30.sp,
+            fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(12.dp))
+        Text(
+            sub,
+            color = NyoraTokens.onSurfaceMuted, fontSize = 14.sp, textAlign = TextAlign.Center,
+            lineHeight = 21.sp,
+        )
+        Spacer(Modifier.height(28.dp))
+
+        // 18+ toggle row
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .glassCard(shape = RoundedCornerShape(18.dp), fill = NyoraTokens.surface1)
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Show 18+ sources", color = NyoraTokens.onSurfaceHigh, fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold)
+                Text("Include adult-only sources in Explore & search.",
+                    color = NyoraTokens.onSurfaceFaint, fontSize = 12.sp)
             }
-            Spacer(Modifier.height(10.dp))
-            OutlinedButton(
-                onClick = { state.cloudRegister(email, password) },
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = RoundedCornerShape(14.dp),
+            Switch(
+                checked = show18, onCheckedChange = { show18 = it },
+                colors = SwitchDefaults.colors(checkedTrackColor = accent),
+            )
+        }
+
+        // Language selector — only shown when the catalog is available. While the
+        // catalog is loading, a spinner sits in its place.
+        if (state.catalogLoading && entries.isEmpty()) {
+            Spacer(Modifier.height(24.dp))
+            CircularProgressIndicator(color = accent, modifier = Modifier.size(28.dp))
+        } else if (langOptions.isNotEmpty()) {
+            Spacer(Modifier.height(18.dp))
+            Column(
+                modifier = Modifier.fillMaxWidth()
+                    .glassCard(shape = RoundedCornerShape(18.dp), fill = NyoraTokens.surface1)
+                    .padding(18.dp),
             ) {
-                Text("Create account")
-            }
-            Spacer(Modifier.height(10.dp))
-            TextButton(
-                onClick = { state.finishOnboarding() },
-                modifier = Modifier.fillMaxWidth().height(46.dp),
-            ) {
-                Text("Continue as guest", color = NyoraTokens.onSurfaceMuted, fontSize = 14.sp)
-            }
-            // Fallback for multi-display/Spaces macOS, where the browser tab can open
-            // on a screen you're not looking at.
-            if (state.signInUrl != null) {
-                Spacer(Modifier.height(18.dp))
-                Text(
-                    "Browser didn't appear? The sign-in link is copied to your clipboard.",
-                    color = NyoraTokens.onSurfaceFaint,
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 17.sp,
-                )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "Open sign-in page again",
-                    color = accent,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.clickable { state.reopenSignInUrl() },
+                Text("LANGUAGES", color = NyoraTokens.onSurfaceFaint, fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium, letterSpacing = 1.5.sp)
+                Spacer(Modifier.height(4.dp))
+                Text("Pick the languages you read, or keep “All languages”.",
+                    color = NyoraTokens.onSurfaceFaint, fontSize = 12.sp)
+                Spacer(Modifier.height(14.dp))
+                LanguageChips(
+                    options = langOptions,
+                    selected = selectedLangs,
+                    accent = accent,
+                    onAll = { selectedLangs.clear() },
+                    onToggle = { code ->
+                        if (selectedLangs.contains(code)) selectedLangs.remove(code)
+                        else selectedLangs.add(code)
+                    },
                 )
             }
         }
+
+        Spacer(Modifier.height(18.dp))
+        Column(
+            modifier = Modifier.fillMaxWidth()
+                .glassCard(shape = RoundedCornerShape(18.dp), fill = NyoraTokens.surface1)
+                .padding(18.dp),
+        ) {
+            Text("GOOD TO KNOW", color = NyoraTokens.onSurfaceFaint, fontSize = 11.sp,
+                fontWeight = FontWeight.Medium, letterSpacing = 1.5.sp)
+            Spacer(Modifier.height(12.dp))
+            FeatureLine(accent, "Tap the heart to favourite a series")
+            FeatureLine(accent, "Pin your go-to sources to search them first")
+            FeatureLine(accent, "Sign in on any device to pick up where you left off")
+        }
+
+        // Live count of what "Start reading" will seed.
+        if (entries.isNotEmpty()) {
+            Spacer(Modifier.height(18.dp))
+            Text(
+                "$addCount source${if (addCount == 1) "" else "s"} will be added",
+                color = accent, fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center,
+            )
+        }
+
+        Spacer(Modifier.height(20.dp))
+        Button(
+            onClick = {
+                state.hideNsfwSources = !show18
+                state.persistSettings()
+                var ids = matchedIds()
+                if (ids.isEmpty()) ids = entries.filter { show18 || !it.isNsfw }.map { it.id }
+                state.seedSources(ids)
+                onDone()
+            },
+            modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.White),
+        ) { Text(cta, fontWeight = FontWeight.SemiBold, fontSize = 15.sp) }
+        Spacer(Modifier.weight(1f))
+    }
+}
+
+// ── Language selection ───────────────────────────────────────────────────────────
+
+/** A distinct language present in the catalog, with a friendly label + count. */
+private data class LangOption(val code: String, val label: String, val count: Int)
+
+/**
+ * Distinct languages across [entries] as [LangOption]s, sorted by count desc then
+ * label. Entries with no language collapse under code "" (label "Other"), so the
+ * option set always covers every source. Mirrors the web's languageOptions().
+ */
+private fun languageOptions(entries: List<CatalogEntry>): List<LangOption> {
+    val counts = LinkedHashMap<String, Int>()
+    for (e in entries) {
+        val code = e.lang.lowercase()
+        counts[code] = (counts[code] ?: 0) + 1
+    }
+    return counts.entries
+        .map { (code, count) -> LangOption(code, if (code.isEmpty()) "Other" else langLabel(code), count) }
+        .sortedWith(compareByDescending<LangOption> { it.count }.thenBy { it.label })
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun LanguageChips(
+    options: List<LangOption>,
+    selected: List<String>,
+    accent: Color,
+    onAll: () -> Unit,
+    onToggle: (String) -> Unit,
+) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Chip(label = "All languages", count = null, active = selected.isEmpty(), accent = accent, onClick = onAll)
+        options.forEach { opt ->
+            Chip(
+                label = opt.label, count = opt.count,
+                active = selected.contains(opt.code), accent = accent,
+                onClick = { onToggle(opt.code) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun Chip(label: String, count: Int?, active: Boolean, accent: Color, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (active) accent.copy(alpha = 0.18f) else NyoraTokens.surface2)
+            .border(
+                width = 1.dp,
+                color = if (active) accent.copy(alpha = 0.65f) else NyoraTokens.onSurfaceFaint.copy(alpha = 0.22f),
+                shape = RoundedCornerShape(50),
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 13.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            color = if (active) accent else NyoraTokens.onSurfaceBody,
+            fontSize = 13.sp,
+            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+        )
+        if (count != null) {
+            Spacer(Modifier.width(6.dp))
+            Text(
+                count.toString(),
+                color = if (active) accent.copy(alpha = 0.85f) else NyoraTokens.onSurfaceFaint,
+                fontSize = 11.sp,
+            )
+        }
+    }
+}
+
+// Friendly language names so onboarding shows names, not ISO codes (matches web).
+private val LANG_NAMES = mapOf(
+    "en" to "English", "es" to "Spanish", "es-419" to "Spanish (LatAm)", "pt" to "Portuguese",
+    "pt-br" to "Portuguese (BR)", "fr" to "French", "de" to "German", "it" to "Italian",
+    "ru" to "Russian", "id" to "Indonesian", "ar" to "Arabic", "tr" to "Turkish", "pl" to "Polish",
+    "vi" to "Vietnamese", "th" to "Thai", "ja" to "Japanese", "ko" to "Korean", "zh" to "Chinese",
+    "zh-hans" to "Chinese", "zh-hant" to "Chinese (Trad.)", "uk" to "Ukrainian", "fa" to "Persian",
+    "nl" to "Dutch", "multi" to "Multi-language", "all" to "Multi-language", "bg" to "Bulgarian",
+    "bn" to "Bengali", "ca" to "Catalan", "cs" to "Czech", "da" to "Danish", "el" to "Greek",
+    "fi" to "Finnish", "he" to "Hebrew", "hi" to "Hindi", "hr" to "Croatian", "hu" to "Hungarian",
+    "is" to "Icelandic", "kn" to "Kannada", "ml" to "Malayalam", "ms" to "Malay", "ne" to "Nepali",
+    "no" to "Norwegian", "ro" to "Romanian", "sk" to "Slovak", "sl" to "Slovenian", "sq" to "Albanian",
+    "sr" to "Serbian", "sv" to "Swedish", "ta" to "Tamil", "ur" to "Urdu", "fil" to "Filipino",
+    "mn" to "Mongolian", "ka" to "Georgian",
+)
+
+private fun langLabel(raw: String): String {
+    val code = raw.lowercase()
+    if (code.isEmpty()) return "Manga"
+    return LANG_NAMES[code] ?: LANG_NAMES[code.take(2)] ?: code.uppercase()
+}
+
+// ── bits ───────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun FeatureLine(accent: Color, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 5.dp)) {
+        Box(Modifier.size(6.dp).clip(CircleShape).background(accent))
+        Spacer(Modifier.width(12.dp))
+        Text(text, color = NyoraTokens.onSurfaceMuted, fontSize = 14.sp)
     }
 }
