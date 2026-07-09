@@ -55,7 +55,6 @@ import com.nyora.linux.ui.theme.glassCard
 fun WelcomeScreen(state: AppState) {
     val accent = LocalNyoraAccent.current.color
     val busy = state.cloudSyncBusy
-    // Keep the welcome up while Google sign-in runs; move on to prefs once it succeeds.
     val authed = state.cloudSyncStatus?.isAuthenticated == true
 
     // "auth" → the sign-in stage; "prefs" → the preferences stage. Everyone passes
@@ -220,26 +219,6 @@ private fun AuthStage(state: AppState, accent: Color, busy: Boolean, onGuest: ()
             modifier = Modifier.fillMaxWidth().height(46.dp),
         ) {
             Text("Continue as guest", color = NyoraTokens.onSurfaceMuted, fontSize = 14.sp)
-        }
-        // Fallback for multi-display/Spaces macOS, where the browser tab can open
-        // on a screen you're not looking at.
-        if (state.signInUrl != null) {
-            Spacer(Modifier.height(18.dp))
-            Text(
-                "Browser didn't appear? The sign-in link is copied to your clipboard.",
-                color = NyoraTokens.onSurfaceFaint,
-                fontSize = 12.sp,
-                textAlign = TextAlign.Center,
-                lineHeight = 17.sp,
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "Open sign-in page again",
-                color = accent,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.clickable { state.reopenSignInUrl() },
-            )
         }
     }
 }

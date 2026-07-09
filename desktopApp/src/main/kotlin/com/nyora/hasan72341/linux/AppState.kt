@@ -64,24 +64,15 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.MediaType.Companion.toMediaType
 import java.awt.Desktop
 import java.io.File
-import java.net.InetSocketAddress
 import java.net.URI
-import java.net.URLDecoder
 import java.net.URLEncoder
-import java.security.MessageDigest
-import java.security.SecureRandom
-import java.util.Base64
-import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
-import com.sun.net.httpserver.HttpServer
-import com.nyora.hasan72341.shared.sync.SupabaseConfig
 
 enum class NavDest {
     HOME, EXPLORE, FAVOURITES, HISTORY, BOOKMARKS, UPDATES, LOCAL_FILES, DOWNLOADS, SETTINGS, STATS, SUGGESTIONS
@@ -293,9 +284,6 @@ class AppState(
     var syncServerUrl   by mutableStateOf("")
     var cloudSyncStatus by mutableStateOf<SupabaseStatusResponse?>(null)
     var cloudSyncBusy   by mutableStateOf(false)
-    // The Google sign-in URL, surfaced so the user can open it manually if the
-    // browser opens off-screen (multi-display macOS). Cleared once signed in.
-    var signInUrl       by mutableStateOf<String?>(null)
     var otaStatus       by mutableStateOf<OtaStatusResponse?>(null)
     var otaBusy         by mutableStateOf(false)
 
@@ -1740,7 +1728,7 @@ class AppState(
         scope.launch {
             runCatching {
                 cloudSyncStatus = fetchCloudSyncStatus()
-            }.onFailure { showStatus("Cloud sync status failed: ${it.message}") }
+            }.onFailure { showStatus("Nyora Sync status failed: ${it.message}") }
         }
     }
 
@@ -1757,9 +1745,9 @@ class AppState(
             runCatching {
                 val status = fetchCloudSyncStatus()
                 cloudSyncStatus = status
-                if (!status.isConfigured) error("Sync server is not configured.")
+                if (!status.isConfigured) error("Nyora Sync is temporarily unavailable.")
 
-                showStatus("Signing in...")
+                showStatus("Signing in…")
                 val q = "?email=${URLEncoder.encode(em, "UTF-8")}&password=${URLEncoder.encode(password, "UTF-8")}"
                 requireSupabaseOk(http.post("$path$q"), "Sign-in failed")
 
@@ -1775,15 +1763,11 @@ class AppState(
                 }
                 refreshLibrary()
                 cloudSyncStatus = fetchCloudSyncStatus()
-                signInUrl = null
                 showStatus("Nyora Sync ready.")
             }.onFailure { showStatus("Sign-in failed: ${it.message}") }
             cloudSyncBusy = false
         }
     }
-
-    /** Re-open the sign-in URL (used by the "didn't open?" fallback). */
-    fun reopenSignInUrl() { signInUrl?.let { openExternalUrl(it) } }
 
     fun cloudSyncNow() {
         if (cloudSyncBusy) return
@@ -1858,101 +1842,6 @@ class AppState(
         if (!resp.ok) error(resp.error.ifBlank { fallback })
     }
 
-    /** Desktop sign-in: loopback Google OAuth with the **Desktop** client
-     *  (PKCE + the Desktop client's non-confidential secret) → a Google id-token,
-     *  which we hand to Supabase `signInWithIdToken` — the SAME flow Android, iOS,
-     *  Mac and web all use. Desktop is the one client type Google permits the
-     *  loopback flow for, so its id-token's `aud` is the Desktop client id —
-     *  that id just needs to be in Supabase's Google "Client IDs" allowlist. */
-    private suspend fun requestGoogleIdToken(clientId: String): String = withContext(Dispatchers.IO) {
-        val verifier = randomUrlSafe(48)
-        val state = randomUrlSafe(24)
-        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        val redirectUri = "http://127.0.0.1:${server.address.port}"
-        val result = CompletableFuture<Result<String>>()
-
-        server.createContext("/") { exchange ->
-            val params = parseQuery(exchange.requestURI.rawQuery)
-            val body = when {
-                params["state"] != state -> {
-                    result.complete(Result.failure(IllegalStateException("OAuth state mismatch.")))
-                    "Nyora sign-in failed. State mismatch."
-                }
-                !params["error"].isNullOrBlank() -> {
-                    result.complete(Result.failure(IllegalStateException(params["error_description"] ?: params["error"]!!)))
-                    "Nyora sign-in failed: ${params["error"]}"
-                }
-                params["code"].isNullOrBlank() -> {
-                    result.complete(Result.failure(IllegalStateException("Google returned no auth code.")))
-                    "Nyora sign-in failed. No code."
-                }
-                else -> {
-                    result.complete(Result.success(params["code"]!!))
-                    "Nyora sign-in complete. You can return to the app."
-                }
-            }
-            val bytes = "<html><body style='font-family:sans-serif;text-align:center;padding-top:50px;'><p>$body</p></body></html>".toByteArray()
-            exchange.responseHeaders.add("Content-Type", "text/html; charset=utf-8")
-            exchange.sendResponseHeaders(200, bytes.size.toLong())
-            exchange.responseBody.use { it.write(bytes) }
-        }
-        server.start()
-
-        try {
-            val authUrl = "https://accounts.google.com/o/oauth2/v2/auth" +
-                "?client_id=${URLEncoder.encode(clientId, "UTF-8")}" +
-                "&redirect_uri=${URLEncoder.encode(redirectUri, "UTF-8")}" +
-                "&response_type=code" +
-                "&scope=${URLEncoder.encode("openid email profile", "UTF-8")}" +
-                "&code_challenge=${URLEncoder.encode(pkceChallenge(verifier), "UTF-8")}" +
-                "&code_challenge_method=S256" +
-                "&state=${URLEncoder.encode(state, "UTF-8")}" +
-                "&prompt=select_account"
-
-            // Copy + surface the link: on multi-display/Spaces macOS the browser
-            // tab can open on a screen the user isn't looking at.
-            runCatching {
-                java.awt.Toolkit.getDefaultToolkit().systemClipboard
-                    .setContents(java.awt.datatransfer.StringSelection(authUrl), null)
-            }
-            withContext(Dispatchers.Main) { signInUrl = authUrl }
-            openExternalUrl(authUrl)
-            showStatus("Waiting for Google sign-in in your browser…")
-            val outcome = try {
-                result.get(180, TimeUnit.SECONDS)
-            } catch (e: java.util.concurrent.TimeoutException) {
-                error("Timed out waiting for the browser to return. If Google showed \"Access blocked\" or stayed on a Google page, this app's Google sign-in still needs to be published in Google Cloud Console (OAuth consent screen → Publish app).")
-            }
-            val code = outcome.getOrThrow()
-
-            val tokenFormBuilder = FormBody.Builder()
-                .add("client_id", clientId)
-                .add("code", code)
-                .add("code_verifier", verifier)
-                .add("grant_type", "authorization_code")
-                .add("redirect_uri", redirectUri)
-            // Desktop clients require their (non-confidential) secret in the exchange.
-            val clientSecret = SupabaseConfig.googleClientSecret
-            if (clientSecret.isNotBlank()) tokenFormBuilder.add("client_secret", clientSecret)
-
-            val req = Request.Builder()
-                .url("https://oauth2.googleapis.com/token")
-                .post(tokenFormBuilder.build())
-                .build()
-
-            authHttp.newCall(req).execute().use { resp ->
-                val text = resp.body?.string().orEmpty()
-                if (!resp.isSuccessful) {
-                    error("Google token exchange failed ${resp.code}: ${text.take(300)}")
-                }
-                val token = prefsJson.decodeFromString<GoogleOAuthTokenResponse>(text)
-                token.id_token.ifBlank { error("Google did not return an ID token.") }
-            }
-        } finally {
-            server.stop(0)
-        }
-    }
-
     fun openExternalUrl(url: String) {
         // Use the OS-native opener FIRST. Desktop.getDesktop().browse() must run on
         // the AWT event thread — calling it from Dispatchers.IO (as the OAuth flow
@@ -1972,27 +1861,6 @@ class AppState(
                 Desktop.getDesktop().browse(URI(url))
             }
         }
-    }
-
-    private fun parseQuery(raw: String?): Map<String, String> =
-        raw.orEmpty().split("&")
-            .filter { it.isNotBlank() }
-            .associate { part ->
-                val idx = part.indexOf("=")
-                val key = if (idx >= 0) part.substring(0, idx) else part
-                val value = if (idx >= 0) part.substring(idx + 1) else ""
-                URLDecoder.decode(key, "UTF-8") to URLDecoder.decode(value, "UTF-8")
-            }
-
-    private fun randomUrlSafe(byteCount: Int): String {
-        val bytes = ByteArray(byteCount)
-        SecureRandom().nextBytes(bytes)
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
-    }
-
-    private fun pkceChallenge(verifier: String): String {
-        val digest = MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray(Charsets.US_ASCII))
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(digest)
     }
 
     fun syncSignIn(email: String, password: String, server: String = syncServerUrl) {
@@ -2121,17 +1989,6 @@ class AppState(
 
     @Serializable
     private data class SignInBody(val email: String = "", val password: String = "")
-
-    @Serializable
-    private data class GoogleOAuthTokenResponse(
-        val id_token: String = "",
-        val error: String = "",
-        val error_description: String = "",
-    )
-
-    private companion object {
-        private const val DESKTOP_GOOGLE_CLIENT_ID = "181067068545-5r2ob1jv4mc0v8gd52fgk2jt28pk3370.apps.googleusercontent.com"
-    }
 
     private fun showStatus(message: String) {
         statusMessage = message
