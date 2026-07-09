@@ -170,13 +170,13 @@ private val SETTINGS_CATEGORIES = listOf(
     SettingsCategory("translation",   "Translation",       "OCR, languages & quality",    Icons.Rounded.Translate),
     SettingsCategory("notifications", "Notifications",     "New chapter alerts",          Icons.Rounded.Notifications),
     SettingsCategory("downloads",     "Downloads",         "Concurrency & format",        Icons.Rounded.Download),
-    SettingsCategory("sync",          "Cloud Sync",        "Google sign-in & restore",    Icons.Rounded.Cloud),
-    SettingsCategory("parsers",       "Parser Updates",    "OTA bundle & version",        Icons.Rounded.Update),
+    SettingsCategory("sync",          "Nyora Sync",        "Account sync & restore",      Icons.Rounded.Cloud),
+    SettingsCategory("parsers",       "App Updates",       "Reader source components",    Icons.Rounded.Update),
     SettingsCategory("network",       "Network",           "Proxy, DoH & mirrors",        Icons.Rounded.Cloud),
     SettingsCategory("tracker",       "Tracker",           "AniList sync",                Icons.Rounded.SyncAlt),
     SettingsCategory("backup",        "Backup & Restore",  "Export or import library",    Icons.Rounded.Storage),
     SettingsCategory("privacy",       "Privacy",           "Incognito & quit",            Icons.Rounded.Lock),
-    SettingsCategory("about",         "About",             "Version & engine",            Icons.Rounded.Info),
+    SettingsCategory("about",         "About",             "App version & details",       Icons.Rounded.Info),
 )
 
 @Composable
