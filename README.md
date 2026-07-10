@@ -64,7 +64,7 @@ Captured running the packaged app on Ubuntu 24.04 (GNOME/Wayland). More are in [
 
 ## About
 
-Nyora is a native Linux manga reader built from scratch with Compose Multiplatform for Desktop. It brings a huge catalogue of online sources, AI-powered whole-page translation, offline downloads, and free Google-backed cloud sync into one clean, responsive desktop application. It installs with a single command on every major distribution — Debian, Ubuntu, Fedora, RHEL, openSUSE, Arch and more, on both x86_64 and ARM64 — and ships its own Java runtime, so there are no dependencies to chase and nothing to configure. It is 100% free, ad-free, has no tracking, and is licensed under Apache-2.0.
+Nyora is a native Linux manga reader built from scratch with Compose Multiplatform for Desktop. It brings a huge catalogue of online sources, AI-powered whole-page translation, offline downloads, and free Nyora Cloud sync into one clean, responsive desktop application. It installs with a single command on every major distribution — Debian, Ubuntu, Fedora, RHEL, openSUSE, Arch and more, on both x86_64 and ARM64 — and ships its own Java runtime, so there are no dependencies to chase and nothing to configure. It is 100% free, ad-free, has no tracking, and is licensed under Apache-2.0.
 
 ## Highlights
 
@@ -73,7 +73,7 @@ Nyora is a native Linux manga reader built from scratch with Compose Multiplatfo
 | Translate | Whole-page AI translation: Tesseract OCR reads each page and the translation is typeset back over the original art. |
 | Download | Offline chapter downloads to disk, plus full backup and restore of your setup. |
 | Sources | Hundreds of online sources for manga, manhwa and manhua, browsable from one built-in catalogue. |
-| Sync | Free cloud sync — sign in with Google and your library follows you across Linux, Windows, macOS, Android, iOS and Web. |
+| Sync | Free Nyora Cloud sync — create an account with email and password and your library follows you across Linux, Windows, macOS, Android, iOS and Web. |
 | Open-Source | Free, ad-free, no tracking, no account required to read, fully auditable, licensed under Apache-2.0. |
 
 ## Table of Contents
@@ -125,7 +125,7 @@ Nyora ships with a built-in catalogue of hundreds of online sources covering man
 
 ### Cloud Sync
 
-Sign in with Google and Nyora keeps your reading life in sync, for free, across every platform. Your library, custom categories, reading history, bookmarks and exact reading progress follow you between Linux, Windows, macOS, Android, iOS and the Web. Start a chapter on your phone during a commute and pick up at the exact page on your Linux desktop at home — no manual exports, no paid tier. Sync is entirely opt-in: skip the sign-in and Nyora stays a fully local, offline-capable reader.
+Create a free Nyora Cloud account with your email and a password, and Nyora keeps your reading life in sync across every platform. Your library, custom categories, reading history, bookmarks and exact reading progress follow you between Linux, Windows, macOS, Android, iOS and the Web. Start a chapter on your phone during a commute and pick up at the exact page on your Linux desktop at home — no manual exports, no paid tier. Sync runs on Nyora Cloud, a self-hosted backend at `stream.hasanraza.tech`, and is entirely opt-in: skip the sign-in and Nyora stays a fully local, offline-capable reader.
 
 ### Reader
 
@@ -137,7 +137,7 @@ Nyora integrates with tracking services, so the lists you keep elsewhere stay in
 
 ### Privacy & Open Source
 
-Nyora is 100% free, ad-free, and contains no tracking. No account is required to read — sign-in is only ever needed if you opt into cloud sync. The project is built from scratch and the packaging and source parsers live in the open under Apache-2.0, so the build is fully auditable. There are no analytics SDKs harvesting your reading habits and no advertising network in the build.
+Nyora is 100% free, ad-free, and contains no tracking. No account is required to read — a Nyora Cloud account is only ever needed if you opt into cloud sync. The project is built from scratch and the packaging and source parsers live in the open under Apache-2.0, so the build is fully auditable. There are no analytics SDKs harvesting your reading habits and no advertising network in the build.
 
 ### Themes & Personalisation
 
@@ -153,7 +153,7 @@ What the Linux build ships today.
 | Offline chapter downloads | Yes |
 | Backup & restore | Yes |
 | Hundreds of built-in sources | Yes |
-| Free Google cloud sync | Yes |
+| Free Nyora Cloud sync (email + password) | Yes |
 | Trackers | Yes |
 | Standard + webtoon reader, LTR / RTL / vertical | Yes |
 | Light / dark / system themes | Yes |
@@ -295,7 +295,7 @@ Nyora is distributed straight from GitHub Releases rather than a paid app store,
 No. There is no advertising network and no analytics harvesting your reading habits. The build is fully auditable.
 
 **Do I need an account?**
-No account is required to read. Signing in with Google is only needed if you want to enable free cloud sync across your devices.
+No account is required to read. A free Nyora Cloud account (email + password) is only needed if you want to enable free cloud sync across your devices.
 
 **Will my data stay private?**
 Yes. If you never sign in, Nyora is fully local and nothing leaves your machine. If you opt into cloud sync, only your library, categories, history, bookmarks and reading progress are synced — there are no analytics SDKs and no advertising network in the build.
@@ -304,7 +304,7 @@ Yes. If you never sign in, Nyora is fully local and nothing leaves your machine.
 Nyora ships with a built-in catalogue of hundreds of online sources for manga, manhwa and manhua. Nyora is just a reader — it is not affiliated with any of these sources and hosts no content itself.
 
 **Is cloud sync private, and what does it sync?**
-Sync is opt-in and tied to your Google sign-in. It syncs your library, custom categories, reading history, bookmarks and reading progress across Linux, Windows, macOS, Android, iOS and the Web. If you never sign in, Nyora stays fully local and nothing leaves your machine.
+Sync is opt-in and tied to your Nyora Cloud account (email + password). It runs on Nyora Cloud, a self-hosted backend at `stream.hasanraza.tech`, and syncs your library, custom categories, reading history, bookmarks and reading progress across Linux, Windows, macOS, Android, iOS and the Web. If you never sign in, Nyora stays fully local and nothing leaves your machine.
 
 **Can I read offline?**
 Yes. Download chapters to disk and read them anywhere with no connection. You can also back up and restore your entire setup, and pair that with cloud sync as a second safety net.
@@ -319,7 +319,7 @@ No. Every artifact — `.deb`, `.rpm` and portable — bundles its own JRE via `
 Debian/Ubuntu/Kali/Parrot (`.deb`), Fedora/RHEL/Rocky/openSUSE (`.rpm`), and Arch/Manjaro plus anything else (portable), on both x86_64 and ARM64.
 
 **Can I contribute to the engine?**
-Yes. The shared Kotlin engine, `nyora-shared`, is a public, open-source repository ([github.com/Hasan72341/nyora-shared](https://github.com/Hasan72341/nyora-shared), Apache-2.0) and it takes PRs like any open repo — the source/parser runtime, the loopback REST server, the SQLDelight store, Supabase sync and the downloads manager are all open to contribution. It is vendored here as a git submodule, so cloning with `--recurse-submodules` gives you a full from-scratch build to work against. See [Contributing](#contributing) for where to start.
+Yes. The shared Kotlin engine, `nyora-shared`, is a public, open-source repository ([github.com/Hasan72341/nyora-shared](https://github.com/Hasan72341/nyora-shared), Apache-2.0) and it takes PRs like any open repo — the source/parser runtime, the loopback REST server, the SQLDelight store, Nyora Cloud sync and the downloads manager are all open to contribution. It is vendored here as a git submodule, so cloning with `--recurse-submodules` gives you a full from-scratch build to work against. See [Contributing](#contributing) for where to start.
 
 **How do I update?**
 Re-run the one-line installer, or download and install the latest package from the Releases page.
@@ -328,7 +328,7 @@ Re-run the one-line installer, or download and install the latest package from t
 
 Nyora is built and maintained in the open, and contributions of every size are genuinely welcome — whether you write Kotlin, package software, speak another language, or simply enjoy the app and want to help others find it. You do not need to be a maintainer or a desktop expert to make a real difference, and you can start today.
 
-One thing worth knowing up front: the desktop apps depend on a shared Kotlin engine, `nyora-shared`, which is a fully **public, open-source** repository ([github.com/Hasan72341/nyora-shared](https://github.com/Hasan72341/nyora-shared), Apache-2.0). It is vendored here as a git submodule, so anyone can do a full from-scratch build that compiles the engine — just clone with `--recurse-submodules`. Contributions are welcome on both sides: the engine itself (source/parser runtime, the loopback REST server, the SQLDelight store, Supabase sync, the downloads manager) takes PRs like any open repo, and the entire Compose UI, the Linux packaging, the installer and the distro integration in this repo are open too. Wherever something lives in the shared engine rather than this repo, it is called out below.
+One thing worth knowing up front: the desktop apps depend on a shared Kotlin engine, `nyora-shared`, which is a fully **public, open-source** repository ([github.com/Hasan72341/nyora-shared](https://github.com/Hasan72341/nyora-shared), Apache-2.0). It is vendored here as a git submodule, so anyone can do a full from-scratch build that compiles the engine — just clone with `--recurse-submodules`. Contributions are welcome on both sides: the engine itself (source/parser runtime, the loopback REST server, the SQLDelight store, Nyora Cloud sync, the downloads manager) takes PRs like any open repo, and the entire Compose UI, the Linux packaging, the installer and the distro integration in this repo are open too. Wherever something lives in the shared engine rather than this repo, it is called out below.
 
 ### Ways to contribute
 
