@@ -1,5 +1,7 @@
 package com.nyora.linux.translate
 
+import com.nyora.linux.ai.onnx.BoundedHttpBody
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -34,7 +36,7 @@ object GoogleTranslate {
     suspend fun translate(text: String, target: String, source: String = "auto"): String {
         if (text.isBlank()) return ""
         return withContext(Dispatchers.IO) {
-            runCatching {
+            try {
                 val q = URLEncoder.encode(text, "UTF-8")
                 val url = "https://translate.googleapis.com/translate_a/single" +
                     "?client=gtx&sl=$source&tl=$target&dt=t&q=$q"
@@ -48,7 +50,8 @@ object GoogleTranslate {
                     .build()
                 http.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) return@use text
-                    val body = response.body?.string() ?: return@use text
+                    val responseBody = response.body ?: return@use text
+                    val body = BoundedHttpBody.readUtf8(responseBody)
                     // Response shape: [[["Hello","こんにちは",null,...], ...], null, "ja"]
                     val segments = json.parseToJsonElement(body).jsonArray[0].jsonArray
                     val sb = StringBuilder()
@@ -58,7 +61,11 @@ object GoogleTranslate {
                     }
                     sb.toString()
                 }
-            }.getOrDefault(text)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                text
+            }
         }
     }
 

@@ -18,7 +18,7 @@
         version = "2.0.0";
 
         debUrlFor = arch:
-          "https://github.com/Hasan72341/nyora-linux/releases/download/v${version}/Nyora-linux-${arch}.deb";
+          "https://github.com/Nyora-Manga/nyora-linux/releases/download/v${version}/Nyora-linux-${arch}.deb";
 
         # Map Nix systems → the arch suffix used in the release asset names.
         debArch = {
@@ -110,7 +110,7 @@
 
             meta = with lib; {
               description = "Free, open-source manga reader (Compose Multiplatform desktop)";
-              homepage = "https://nyora.pages.dev";
+              homepage = "https://nyora.xyz";
               license = licenses.asl20;
               platforms = [ "x86_64-linux" "aarch64-linux" ];
               mainProgram = "nyora";

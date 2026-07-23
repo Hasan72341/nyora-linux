@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -31,6 +33,7 @@ import com.nyora.linux.AppState
 import com.nyora.linux.bridge.GlobalSearchGroup
 import com.nyora.linux.ui.theme.AnimeAsyncImage
 import com.nyora.linux.ui.theme.LocalNyoraAccent
+import com.nyora.linux.ui.theme.NyoraScrollContainer
 import com.nyora.linux.ui.theme.NyoraTokens
 import com.nyora.linux.ui.theme.SectionHeader
 import com.nyora.linux.ui.theme.SystemTag
@@ -173,7 +176,13 @@ fun GlobalSearchScreen(state: AppState) {
                         GlobalIdleState()
 
                     else -> {
+                        val listState = rememberLazyListState()
+                        NyoraScrollContainer(
+                            adapter = rememberScrollbarAdapter(listState),
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
                         LazyColumn(
+                            state = listState,
                             modifier = Modifier.fillMaxSize(),
                             verticalArrangement = Arrangement.spacedBy(32.dp),
                             contentPadding = PaddingValues(
@@ -194,6 +203,7 @@ fun GlobalSearchScreen(state: AppState) {
                                     coverUrlFor = { manga -> state.coverProxyUrl(manga.coverUrl) },
                                 )
                             }
+                        }
                         }
                     }
                 }

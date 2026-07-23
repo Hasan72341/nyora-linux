@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -35,6 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nyora.linux.AppState
@@ -43,6 +45,10 @@ import com.nyora.linux.ReaderMode
 import com.nyora.linux.ui.theme.Accent
 import com.nyora.linux.ui.theme.AppearanceMode
 import com.nyora.linux.ui.theme.LocalNyoraAccent
+import com.nyora.linux.ui.theme.NyoraButton
+import com.nyora.linux.ui.theme.NyoraTag
+import com.nyora.linux.ui.theme.NyoraTone
+import com.nyora.linux.ui.theme.NyoraScrollContainer
 import com.nyora.linux.ui.theme.NyoraTokens
 import com.nyora.linux.ui.theme.SectionHeader
 import com.nyora.linux.ui.theme.SystemTag
@@ -179,10 +185,15 @@ private val SETTINGS_CATEGORIES = listOf(
 
 @Composable
 private fun SettingsRoot(state: AppState, open: (String) -> Unit) {
+    val scrollState = rememberScrollState()
+    NyoraScrollContainer(
+        adapter = rememberScrollbarAdapter(scrollState),
+        modifier = Modifier.fillMaxSize(),
+    ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
@@ -199,6 +210,7 @@ private fun SettingsRoot(state: AppState, open: (String) -> Unit) {
             }
         }
         Spacer(Modifier.height(24.dp))
+    }
     }
 }
 
@@ -222,10 +234,15 @@ private fun DetailHeader(onBack: () -> Unit) {
 
 @Composable
 private fun SettingsDetail(state: AppState, key: String, onBack: () -> Unit) {
+    val scrollState = rememberScrollState()
+    NyoraScrollContainer(
+        adapter = rememberScrollbarAdapter(scrollState),
+        modifier = Modifier.fillMaxSize(),
+    ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
@@ -532,11 +549,43 @@ private fun SettingsDetail(state: AppState, key: String, onBack: () -> Unit) {
             }
         }
 
+        // (3.5) AI MODELS ──────────────────────────────────────────────────────────────────
+        if (key == "translation") SettingsSection(eyebrow = "On-device AI", title = "AI Models", icon = Icons.Rounded.Translate) {
+            LaunchedEffect(Unit) { state.refreshOnnxReady() }
+            state.onnxDownloadLabel?.let {
+                Text("Downloading — $it", color = NyoraTokens.onSurfaceMuted, style = MaterialTheme.typography.bodySmall)
+            }
+            SettingsRow("Translation models") {
+                if (state.onnxTranslateReady) NyoraTag("Ready", NyoraTone.Success)
+                else NyoraButton(text = "Download", onClick = { state.downloadTranslateModels() })
+            }
+            Text(
+                "Manga-Bubble-YOLO detector + on-device OCR (manga-ocr / PP-OCR). ~20–130 MB; runs offline.",
+                color = NyoraTokens.onSurfaceMuted,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            HairlineDivider()
+            SettingsToggle("Colorize Pages", state.colorizeEnabled) { state.toggleColorize() }
+            SettingsRow("Colorizer model") {
+                if (state.onnxColorizeReady) NyoraTag("Ready", NyoraTone.Success)
+                else NyoraButton(text = "Download", onClick = { state.downloadColorizeModel() })
+            }
+            Text(
+                "manga-colorization-v2 (~62 MB) — colours black-and-white pages on-device.",
+                color = NyoraTokens.onSurfaceMuted,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            HairlineDivider()
+            SettingsToggle("Fetch Series Context (character names)", state.translateFandom) {
+                state.translateFandom = it
+            }
+        }
+
         // (4) TRANSLATION ──────────────────────────────────────────────────────────────────
         if (key == "translation") SettingsSection(eyebrow = "OCR / MT", title = "Translation", icon = Icons.Rounded.Translate) {
             // Translation enabled
             SettingsToggle("Enable In-Reader Translation", state.translateEnabled) {
-                state.translateEnabled = it
+                state.setTranslationEnabled(it)
             }
             HairlineDivider()
             // Instant translate on chapter open
@@ -585,6 +634,16 @@ private fun SettingsDetail(state: AppState, key: String, onBack: () -> Unit) {
             SettingsToggle("Translation debug overlay", state.debugHud) {
                 state.debugHud = it; state.persistSettings()
             }
+            HairlineDivider()
+            // AI Refinement (BYOK) \u2014 OpenAI/Anthropic-compatible LLM cleanup after MT.
+            SettingsRow("AI Refinement") {
+                Text(
+                    if (state.byokApiKey.isBlank()) "Off" else "On",
+                    color = if (state.byokApiKey.isBlank()) NyoraTokens.onSurfaceMuted else LocalNyoraAccent.current.color,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            ByokFields(state)
             HairlineDivider()
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp),
@@ -680,10 +739,10 @@ private fun SettingsDetail(state: AppState, key: String, onBack: () -> Unit) {
             HairlineDivider()
             SettingsRow("Website") {
                 Text(
-                    "nyora.pages.dev",
+                    "nyora.xyz",
                     style = MaterialTheme.typography.labelSmall,
                     color = LocalNyoraAccent.current.color,
-                    modifier = Modifier.clickable { state.openExternalUrl("https://nyora.pages.dev") },
+                    modifier = Modifier.clickable { state.openExternalUrl("https://nyora.xyz") },
                 )
             }
             HairlineDivider()
@@ -692,7 +751,7 @@ private fun SettingsDetail(state: AppState, key: String, onBack: () -> Unit) {
                     "Hasan72341/nyora-linux",
                     style = MaterialTheme.typography.labelSmall,
                     color = LocalNyoraAccent.current.color,
-                    modifier = Modifier.clickable { state.openExternalUrl("https://github.com/Hasan72341/nyora-linux") },
+                    modifier = Modifier.clickable { state.openExternalUrl("https://github.com/Nyora-Manga/nyora-linux") },
                 )
             }
             HairlineDivider()
@@ -784,6 +843,7 @@ private fun SettingsDetail(state: AppState, key: String, onBack: () -> Unit) {
         }
 
         Spacer(Modifier.height(48.dp))
+    }
     }
 }
 
@@ -1373,5 +1433,52 @@ private fun SchemePreviewCard(
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
             modifier = Modifier.padding(start = 2.dp),
         )
+    }
+}
+
+@Composable
+private fun ByokFields(state: AppState) {
+    var baseUrl by remember { mutableStateOf(state.byokBaseUrl) }
+    var apiKey by remember { mutableStateOf(state.byokApiKey) }
+    var model by remember { mutableStateOf(state.byokModel) }
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedTextField(
+            value = baseUrl,
+            onValueChange = { baseUrl = it; state.setByok(it, apiKey, model) },
+            label = { Text("Base URL") },
+            placeholder = { Text("https://api.openai.com/v1") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = apiKey,
+            onValueChange = { apiKey = it; state.setByok(baseUrl, it, model) },
+            label = { Text("API key") },
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = model,
+            onValueChange = { model = it; state.setByok(baseUrl, apiKey, it) },
+            label = { Text("Model") },
+            placeholder = { Text("gpt-4o-mini") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            "OpenAI-compatible (OpenAI, OpenRouter, Groq, LM Studio, Ollama) OR Anthropic \u2014 " +
+                "enter an api.anthropic.com base URL or a claude model and it switches automatically. " +
+                "Your API key is used only for this app session and is never saved to appPrefs.json. " +
+                "Use HTTPS; HTTP is accepted only for localhost/loopback development servers.",
+            style = MaterialTheme.typography.bodySmall,
+            color = NyoraTokens.onSurfaceMuted,
+        )
+        state.byokEndpointError?.let { error ->
+            Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
     }
 }

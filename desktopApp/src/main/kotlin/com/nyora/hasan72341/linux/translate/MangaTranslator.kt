@@ -1,11 +1,21 @@
 package com.nyora.linux.translate
 
+import com.nyora.linux.ai.onnx.MangaMt
+import com.nyora.linux.ai.onnx.MangaOcr
+import com.nyora.linux.ai.onnx.ColorizedPageCache
+import com.nyora.linux.ai.onnx.OnnxColorizer
+import com.nyora.linux.ai.onnx.OnnxDetector
+import com.nyora.linux.ai.onnx.PaddleOcr
+import com.nyora.linux.ai.onnx.SeriesGlossary
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import javax.imageio.ImageIO
 
 /**
@@ -47,6 +57,15 @@ data class PageTranslation(
     val ocrAvailable: Boolean,
 )
 
+/** Result of colourizing a reader page, kept explicit so the UI can distinguish
+ * an unavailable model from an intentionally rejected oversized page. */
+sealed class ColorizePageResult {
+    data class Success(val path: String) : ColorizePageResult()
+    object ModelUnavailable : ColorizePageResult()
+    object InputTooLarge : ColorizePageResult()
+    object Failed : ColorizePageResult()
+}
+
 /**
  * Orchestrates the OCR -> translate pipeline for a manga page. Every public
  * call fails soft: errors yield an empty translation rather than throwing.
@@ -54,6 +73,20 @@ data class PageTranslation(
 class MangaTranslator {
 
     private val http = OkHttpClient()
+
+    private sealed class LoadedPage {
+        data class Success(val bytes: ByteArray, val image: BufferedImage) : LoadedPage()
+        object TooLarge : LoadedPage()
+        object Failed : LoadedPage()
+    }
+
+    companion object {
+        // A page download is untrusted input. Keep both its compressed size and
+        // decoded pixel count bounded before OCR/ONNX allocate large buffers.
+        private const val MAX_PAGE_DOWNLOAD_BYTES = 48L * 1024L * 1024L
+        private const val MAX_PAGE_PIXELS = 24_000_000L
+        private const val MAX_PAGE_EDGE = 16_384
+    }
 
     /**
      * Download [imageUrl], OCR it with [ocrLangs], and translate every detected
@@ -66,27 +99,23 @@ class MangaTranslator {
         ocrLangs: String,
         target: String,
     ): PageTranslation = withContext(Dispatchers.IO) {
-        runCatching {
-            val request = Request.Builder().url(imageUrl).build()
-            val bytes = http.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@runCatching PageTranslation(0, 0, emptyList(), true)
-                response.body?.bytes() ?: return@runCatching PageTranslation(0, 0, emptyList(), true)
-            }
-
+        try {
+            val page = loadPageImage(imageUrl)
+            if (page !is LoadedPage.Success) return@withContext PageTranslation(0, 0, emptyList(), true)
+            val bytes = page.bytes
             // Decode the ORIGINAL image once; bubble boxes are in its pixel space.
-            val image: BufferedImage = ImageIO.read(ByteArrayInputStream(bytes))
-                ?: return@runCatching PageTranslation(0, 0, emptyList(), true)
+            val image = page.image
             val width = image.width
             val height = image.height
 
             val (boxes, available) = TesseractOcr.recognize(bytes, ocrLangs)
             if (!available) {
-                return@runCatching PageTranslation(width, height, emptyList(), false)
+                return@withContext PageTranslation(width, height, emptyList(), false)
             }
 
             val usable = boxes.filter { it.text.trim().isNotEmpty() }
             if (usable.isEmpty()) {
-                return@runCatching PageTranslation(width, height, emptyList(), true)
+                return@withContext PageTranslation(width, height, emptyList(), true)
             }
 
             val translations = GoogleTranslate.translateAll(usable.map { it.text }, target)
@@ -116,7 +145,189 @@ class MangaTranslator {
             }
 
             PageTranslation(width, height, blocks, true)
-        }.getOrDefault(PageTranslation(0, 0, emptyList(), true))
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            PageTranslation(0, 0, emptyList(), true)
+        }
+    }
+
+    /**
+     * The nyora-web pipeline (core/translate/engine.js), run fully on-device via
+     * onnxruntime: Manga-Bubble-YOLO detection → per-language OCR (manga-ocr for ja,
+     * PP-OCR for zh/en/ko) → optional character-name glossary substitution → Google
+     * gtx machine translation with manga repair (MangaMt) → optional LLM refinement.
+     * Produces the same [PageTranslation] the overlay renders. Fails soft.
+     */
+    suspend fun translatePageImageOnnx(
+        imageUrl: String,
+        source: String,
+        target: String,
+        refineCfg: MangaMt.RefineCfg?,
+        title: String,
+        fandom: Boolean,
+    ): PageTranslation = withContext(Dispatchers.IO) {
+        try {
+            val src = when {
+                source.startsWith("ja") || source.startsWith("jp") -> "ja"
+                source.startsWith("zh") || source.startsWith("ch") -> "zh"
+                source.startsWith("ko") -> "ko"
+                source.startsWith("en") -> "en"
+                else -> "ja"
+            }
+            val ocrReady = OnnxDetector.isReady() &&
+                if (src == "ja") MangaOcr.isReady() else PaddleOcr.isReady(src)
+            val page = loadPageImage(imageUrl)
+            if (page !is LoadedPage.Success) return@withContext PageTranslation(0, 0, emptyList(), true)
+            val image = page.image
+            val width = image.width
+            val height = image.height
+            if (!ocrReady) return@withContext PageTranslation(width, height, emptyList(), false)
+
+            val boxes = OnnxDetector.detect(image)
+            val ocrBoxes = boxes.mapNotNull { b ->
+                val x = b.x.coerceIn(0, width - 1)
+                val y = b.y.coerceIn(0, height - 1)
+                val w = b.w.coerceIn(1, width - x)
+                val h = b.h.coerceIn(1, height - y)
+                if (w < 2 || h < 2) return@mapNotNull null
+                val crop = image.getSubimage(x, y, w, h)
+                val text = if (src == "ja") MangaOcr.recognize(crop) else PaddleOcr.recognize(crop, src)
+                if (text.isBlank()) null else OcrBox(x, y, w, h, text.trim(), b.score)
+            }
+            if (ocrBoxes.isEmpty()) return@withContext PageTranslation(width, height, emptyList(), true)
+
+            val rawTexts = ocrBoxes.map { it.text }
+            val glossary = if (fandom) {
+                try {
+                    SeriesGlossary.resolve(title)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Throwable) {
+                    null
+                }
+            } else null
+            val hits = if (glossary != null) SeriesGlossary.detectNames(rawTexts, glossary.names) else emptyList()
+            val srcTexts = SeriesGlossary.applyNames(rawTexts, hits)
+
+            val mt = MangaMt.translateBatch(srcTexts, target, src)
+            val finalTexts = if (refineCfg != null) {
+                val ctx = SeriesGlossary.glossaryContext(glossary, hits)
+                try {
+                    MangaMt.refineBatch(srcTexts, mt, target, refineCfg.copy(context = ctx)) ?: mt
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Throwable) {
+                    mt
+                }
+            } else mt
+
+            val blocks = ocrBoxes.mapIndexedNotNull { index, box ->
+                val translated = finalTexts.getOrElse(index) { box.text }
+                if (translated.isBlank()) return@mapIndexedNotNull null
+                val fillRgb = sampleBubbleBackground(image, box)
+                val r = (fillRgb shr 16) and 0xFF
+                val g = (fillRgb shr 8) and 0xFF
+                val b = fillRgb and 0xFF
+                val fillArgb = (0xFF000000.toInt()) or fillRgb
+                val luminance = 0.299 * r + 0.587 * g + 0.114 * b
+                val textArgb = if (luminance > 140) 0xFF1A1A1A.toInt() else 0xFFF5F5F5.toInt()
+                TransBlock(
+                    left = box.left, top = box.top, width = box.width, height = box.height,
+                    original = box.text, translated = translated,
+                    fillArgb = fillArgb, textArgb = textArgb,
+                    fillPolygon = rayCastBubble(image, box, luminance),
+                )
+            }
+            PageTranslation(width, height, blocks, true)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            PageTranslation(0, 0, emptyList(), true)
+        }
+    }
+
+    /** Colorize one page on-device and store it in the bounded managed cache. */
+    suspend fun colorizePageImage(imageUrl: String): ColorizePageResult = withContext(Dispatchers.IO) {
+        try {
+            if (!OnnxColorizer.isReady()) return@withContext ColorizePageResult.ModelUnavailable
+            val page = loadPageImage(imageUrl)
+            when (page) {
+                LoadedPage.TooLarge -> return@withContext ColorizePageResult.InputTooLarge
+                LoadedPage.Failed -> return@withContext ColorizePageResult.Failed
+                is LoadedPage.Success -> Unit
+            }
+            val image = (page as LoadedPage.Success).image
+            if (!OnnxColorizer.canColorize(image.width, image.height)) {
+                return@withContext ColorizePageResult.InputTooLarge
+            }
+            ColorizePageResult.Success(ColorizedPageCache.write(OnnxColorizer.colorize(image)))
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            ColorizePageResult.Failed
+        }
+    }
+
+    private fun loadPageImage(imageUrl: String): LoadedPage {
+        val request = Request.Builder().url(imageUrl).build()
+        http.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return LoadedPage.Failed
+            val body = response.body ?: return LoadedPage.Failed
+            if (body.contentLength() > MAX_PAGE_DOWNLOAD_BYTES) return LoadedPage.TooLarge
+            val bytes = body.byteStream().use { input -> readBounded(input, MAX_PAGE_DOWNLOAD_BYTES) }
+                ?: return LoadedPage.TooLarge
+            return decodePage(bytes)
+        }
+    }
+
+    private fun readBounded(input: InputStream, limit: Long): ByteArray? {
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(1 shl 16)
+        var total = 0L
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            if (count == 0) continue
+            total += count
+            if (total > limit) return null
+            output.write(buffer, 0, count)
+        }
+        return output.toByteArray()
+    }
+
+    private fun decodePage(bytes: ByteArray): LoadedPage {
+        val stream = ImageIO.createImageInputStream(ByteArrayInputStream(bytes)) ?: return LoadedPage.Failed
+        stream.use {
+            val readers = ImageIO.getImageReaders(stream)
+            if (!readers.hasNext()) return LoadedPage.Failed
+            val reader = readers.next()
+            try {
+                reader.setInput(stream, true, true)
+                val width = reader.getWidth(0)
+                val height = reader.getHeight(0)
+                if (
+                    width <= 0 || height <= 0 ||
+                    width > MAX_PAGE_EDGE || height > MAX_PAGE_EDGE ||
+                    width.toLong() * height.toLong() > MAX_PAGE_PIXELS
+                ) {
+                    return LoadedPage.TooLarge
+                }
+                val image = reader.read(0) ?: return LoadedPage.Failed
+                if (
+                    image.width <= 0 || image.height <= 0 ||
+                    image.width > MAX_PAGE_EDGE || image.height > MAX_PAGE_EDGE ||
+                    image.width.toLong() * image.height.toLong() > MAX_PAGE_PIXELS
+                ) {
+                    return LoadedPage.TooLarge
+                }
+                return LoadedPage.Success(bytes, image)
+            } catch (_: Throwable) {
+                return LoadedPage.Failed
+            } finally {
+                reader.dispose()
+            }
+        }
     }
 
     /**

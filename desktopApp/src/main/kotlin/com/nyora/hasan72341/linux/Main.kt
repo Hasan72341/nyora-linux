@@ -18,6 +18,8 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.nyora.linux.ui.App
 import com.nyora.hasan72341.shared.HelperMain
+import com.nyora.hasan72341.shared.scrobbling.DesktopOAuthCallbacks
+import com.nyora.hasan72341.shared.scrobbling.DesktopUrlScheme
 import com.nyora.hasan72341.shared.data.ExtensionInstaller
 import com.nyora.hasan72341.shared.data.SourceCatalogClient
 import com.nyora.hasan72341.shared.proxy.NyoraRestServer
@@ -69,7 +71,12 @@ private fun ensureLinuxDesktopEntry() {
     }
 }
 
-fun main() {
+fun main(args: Array<String>) {
+    // Register the nyora:// URL scheme + single-instance dispatcher for tracker
+    // OAuth callbacks. If this launch was only the OS delivering a nyora:// URL to
+    // an already-running instance, it forwards the URL and we exit before booting.
+    if (DesktopUrlScheme.install(args) { url -> DesktopOAuthCallbacks.complete(url) }) return
+
     // ── Display scaling ───────────────────────────────────────────────────────
     // JBR/Skiko on some Linux setups mis-detect the display (e.g. GDK_SCALE=2 or a
     // high Xft.dpi) and render the whole UI at 200%. Force 1:1 by default so the UI

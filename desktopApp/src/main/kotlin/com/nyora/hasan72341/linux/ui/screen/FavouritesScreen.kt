@@ -8,7 +8,9 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DeleteOutline
@@ -31,6 +33,7 @@ import com.nyora.linux.AppState
 import com.nyora.linux.bridge.CategoryDto
 import com.nyora.linux.ui.theme.AnimeAsyncImage
 import com.nyora.linux.ui.theme.LocalNyoraAccent
+import com.nyora.linux.ui.theme.NyoraScrollContainer
 import com.nyora.linux.ui.theme.NyoraTokens
 import com.nyora.linux.ui.theme.SectionHeader
 import com.nyora.linux.ui.theme.SystemTag
@@ -90,19 +93,26 @@ fun FavouritesScreen(state: AppState) {
             if (displayList.isEmpty()) {
                 EmptyLibraryState()
             } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 160.dp),
-                    horizontalArrangement = Arrangement.spacedBy(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp),
+                val gridState = rememberLazyGridState()
+                NyoraScrollContainer(
+                    adapter = rememberScrollbarAdapter(gridState),
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    items(displayList, key = { it.id }) { manga ->
-                        val src = state.sourceFor(manga)
-                        FavouriteBentoCard(
-                            manga = manga,
-                            coverUrl = state.coverProxyUrl(manga.coverUrl),
-                            onClick = { state.openDetails(manga, src) },
-                        )
+                    LazyVerticalGrid(
+                        state = gridState,
+                        columns = GridCells.Adaptive(minSize = 160.dp),
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                        contentPadding = PaddingValues(end = 10.dp),
+                    ) {
+                        items(displayList, key = { it.id }) { manga ->
+                            val src = state.sourceFor(manga)
+                            FavouriteBentoCard(
+                                manga = manga,
+                                coverUrl = state.coverProxyUrl(manga.coverUrl),
+                                onClick = { state.openDetails(manga, src) },
+                            )
+                        }
                     }
                 }
             }

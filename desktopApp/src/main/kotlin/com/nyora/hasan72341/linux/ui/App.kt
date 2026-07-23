@@ -48,6 +48,7 @@ import com.nyora.linux.ui.screen.SuggestionsScreen
 import com.nyora.linux.ui.screen.UpdatesScreen
 import com.nyora.linux.ui.theme.NyoraTheme
 import com.nyora.linux.ui.theme.NyoraTokens
+import com.nyora.linux.ui.theme.ambientGlow
 
 @Composable
 fun App(state: AppState) {
@@ -69,7 +70,7 @@ fun App(state: AppState) {
                         when {
                             state.showGlobalSearch -> { state.showGlobalSearch = false; true }
                             state.showCatalog      -> { state.showCatalog = false; true }
-                            state.showReader       -> { state.showReader = false; true }
+                            state.showReader       -> { state.closeReader(); true }
                             state.showDetails      -> { state.showDetails = false; true }
                             else -> false
                         }
@@ -163,6 +164,10 @@ private fun MainContent(state: AppState, isCompact: Boolean) {
                     NavDest.STATS -> StatsScreen(state)
                     NavDest.SUGGESTIONS -> SuggestionsScreen(state)
                 }
+
+                // Signature ambient accent glow — one soft radial over the content area.
+                // Empty, non-interactive overlay so clicks pass through.
+                Box(Modifier.fillMaxSize().ambientGlow(0.05f))
             }
         }
     }

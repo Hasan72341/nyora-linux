@@ -10,7 +10,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -32,6 +34,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
@@ -44,6 +47,7 @@ import com.nyora.linux.AppState
 import com.nyora.linux.ExploreMode
 import com.nyora.linux.ui.theme.AnimeAsyncImage
 import com.nyora.linux.ui.theme.LocalNyoraAccent
+import com.nyora.linux.ui.theme.NyoraScrollContainer
 import com.nyora.linux.ui.theme.NyoraTokens
 import com.nyora.linux.ui.theme.SectionHeader
 import com.nyora.linux.ui.theme.SystemTag
@@ -552,11 +556,18 @@ private fun ColumnScope.BrowseBody(state: AppState, source: MangaSource) {
             }
 
         else -> {
+            val gridState = rememberLazyGridState()
+            NyoraScrollContainer(
+                adapter = rememberScrollbarAdapter(gridState),
+                modifier = Modifier.fillMaxWidth().weight(1f),
+            ) {
             LazyVerticalGrid(
+                state = gridState,
                 columns = GridCells.Adaptive(minSize = 160.dp),
                 horizontalArrangement = Arrangement.spacedBy(20.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
-                modifier = Modifier.fillMaxWidth().weight(1f),
+                contentPadding = PaddingValues(end = 10.dp),
+                modifier = Modifier.fillMaxSize(),
             ) {
                 mangaList.firstOrNull()?.let { hero ->
                     item(span = { GridItemSpan(maxCurrentLineSpan) }) {
@@ -580,6 +591,7 @@ private fun ColumnScope.BrowseBody(state: AppState, source: MangaSource) {
                         }
                     }
                 }
+            }
             }
         }
     }
@@ -646,9 +658,15 @@ private fun HeroBentoModule(manga: Manga, state: AppState) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(120.dp)
+                .height(200.dp)
                 .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
-                .background(NyoraTokens.bg.copy(alpha = 0.72f))
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Transparent,
+                        0.55f to NyoraTokens.bg.copy(alpha = 0.65f),
+                        1f to NyoraTokens.bg.copy(alpha = 0.94f),
+                    ),
+                )
                 .align(Alignment.BottomCenter),
         )
         Column(modifier = Modifier.align(Alignment.BottomStart).padding(28.dp)) {

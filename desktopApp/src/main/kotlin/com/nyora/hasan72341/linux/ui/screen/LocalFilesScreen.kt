@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Archive
@@ -23,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.nyora.linux.AppState
 import com.nyora.linux.bridge.LocalCbzEntry
 import com.nyora.linux.ui.theme.LocalNyoraAccent
+import com.nyora.linux.ui.theme.NyoraScrollContainer
 import com.nyora.linux.ui.theme.NyoraTokens
 import com.nyora.linux.ui.theme.SectionHeader
 import com.nyora.linux.ui.theme.SystemTag
@@ -134,17 +137,23 @@ fun LocalFilesScreen(state: AppState) {
                 LocalFilesEmptyState(accent = accent)
             }
         } else {
-            LazyColumn(
+            val listState = rememberLazyListState()
+            NyoraScrollContainer(
+                adapter = rememberScrollbarAdapter(listState),
                 modifier = Modifier.fillMaxWidth().weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(bottom = 32.dp),
             ) {
-                items(state.localFiles, key = { it.path }) { entry ->
-                    LocalFileRow(
-                        entry = entry,
-                        accent = accent,
-                        onClick = { state.openLocalCbz(entry.path) },
-                    )
+                LazyColumn(
+                    state = listState,
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 32.dp, end = 10.dp),
+                ) {
+                    items(state.localFiles, key = { it.path }) { entry ->
+                        LocalFileRow(
+                            entry = entry,
+                            accent = accent,
+                            onClick = { state.openLocalCbz(entry.path) },
+                        )
+                    }
                 }
             }
         }
