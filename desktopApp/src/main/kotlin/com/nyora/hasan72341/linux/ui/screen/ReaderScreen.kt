@@ -1204,6 +1204,7 @@ private fun ReaderSettingsDialog(
 
                 // ── OCR source language (must match the page's text language) ──
                 val ocrLangs = listOf(
+                    "Auto (source language)" to "auto",
                     "Japanese" to "jpn+jpn_vert",
                     "Chinese" to "chi_sim+chi_sim_vert",
                     "Korean" to "kor",

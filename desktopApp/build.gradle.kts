@@ -8,6 +8,7 @@ plugins {
 }
 
 dependencies {
+    testImplementation(kotlin("test"))
     implementation(project(":shared"))
 
     implementation(compose.desktop.currentOs)
@@ -113,3 +114,7 @@ configurations.all {
         }
     }
 }
+
+// The translation post-processing is pure and heavily regex-driven, so it is
+// verified against the web reader's output rather than by inspection.
+tasks.withType<Test>().configureEach { useJUnitPlatform() }

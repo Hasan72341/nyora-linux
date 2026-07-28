@@ -88,6 +88,7 @@ private val TARGET_LANG_OPTIONS = listOf(
 )
 
 private val OCR_LANG_OPTIONS = listOf(
+    "auto"                 to "Auto (source language)",
     "jpn"                  to "Japanese",
     "eng"                  to "English",
     "kor"                  to "Korean",

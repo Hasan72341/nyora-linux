@@ -1007,7 +1007,7 @@ class AppState(
         if (translateJobs[index]?.isActive == true) return
         val page = readerPages[index]
         val identity = translationIdentity(index, page) ?: return
-        val source = translateLangs
+        val source = effectiveTranslateLangs()
         val target = translateTarget
         val title = readerManga?.title.orEmpty()
         val useFandom = translateFandom
@@ -1163,9 +1163,27 @@ class AppState(
         else -> "ja"
     }
 
+    /**
+     * The OCR/source language actually used for translation. "auto" resolves from
+     * the open manga's own source language, matching the web reader — otherwise a
+     * Korean title read with the Japanese default is OCR'd as Japanese and every
+     * bubble comes back wrong. Unknown falls back to the previous default.
+     */
+    private fun effectiveTranslateLangs(): String {
+        if (translateLangs != "auto") return translateLangs
+        val code = readerManga?.let { sourceFor(it) }?.lang?.lowercase().orEmpty()
+        return when {
+            code.startsWith("ja") -> "jpn+jpn_vert"
+            code.startsWith("zh") || code.startsWith("ch") -> "chi_sim+chi_sim_vert"
+            code.startsWith("ko") -> "kor"
+            code.startsWith("en") -> "eng"
+            else -> "jpn+eng"
+        }
+    }
+
     /** Refresh the "models downloaded?" flags the Settings/reader gates read. */
     fun refreshOnnxReady() {
-        val source = onnxSrc(translateLangs)
+        val source = onnxSrc(effectiveTranslateLangs())
         scope.launch {
             val readiness = withContext(Dispatchers.IO) {
                 val ocr = if (source == "ja") com.nyora.linux.ai.onnx.MangaOcr.isReady()
@@ -1173,7 +1191,7 @@ class AppState(
                 (com.nyora.linux.ai.onnx.OnnxDetector.isReady() && ocr) to
                     com.nyora.linux.ai.onnx.OnnxColorizer.isReady()
             }
-            if (source == onnxSrc(translateLangs)) onnxTranslateReady = readiness.first
+            if (source == onnxSrc(effectiveTranslateLangs())) onnxTranslateReady = readiness.first
             onnxColorizeReady = readiness.second
         }
     }
@@ -1187,7 +1205,7 @@ class AppState(
 
     /** Download the translation vision models (detector + the OCR for the source language). */
     fun downloadTranslateModels() {
-        val source = onnxSrc(translateLangs)
+        val source = onnxSrc(effectiveTranslateLangs())
         startModelDownload("Preparing translation models…", { "Translation models $it%" }, "Model download failed") { progress ->
             com.nyora.linux.ai.onnx.OnnxDetector.downloadModel { progress(it / 5) }
             if (source == "ja") {
